@@ -1,0 +1,32 @@
+name: tasty-autocollect
+version: 0.1.0.0
+category: Testing
+synopsis: Autocollection of tasty tests.
+description: Autocollection of tasty tests. See README.md for more details.
+license: BSD3
+license-file: LICENSE.md
+author: Brandon Chinn <brandonchinn178@gmail.com>
+maintainer: Brandon Chinn <brandonchinn178@gmail.com>
+
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+
+github: brandonchinn178/tasty-autocollect
+
+ghc-options: -Wall
+when:
+  - condition: impl(ghc >= 8.0)
+    ghc-options:
+      - -Wcompat
+      - -Wincomplete-record-updates
+      - -Wincomplete-uni-patterns
+      - -Wnoncanonical-monad-instances
+  - condition: impl(ghc < 8.8)
+    ghc-options:
+      - -Wnoncanonical-monadfail-instances
+
+library:
+  source-dirs: src
+  dependencies:
+    - base >= 4.9 && < 5
