@@ -10,9 +10,10 @@ jobs:
     strategy:
       matrix:
         stack_yaml:
-          - stack-ghc-8.10.yaml
+          # TODO: uncomment these
+          # - stack-ghc-8.10.yaml
           - stack-ghc-9.0.yaml
-          - stack-ghc-9.2.yaml
+          # - stack-ghc-9.2.yaml
         include:
           - stack_yaml: stack.yaml
             latest: true
@@ -29,8 +30,9 @@ jobs:
         with:
           path: ~/.stack
           key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
-      - name: Build + test
-        run: stack test --coverage
+      # TODO: uncomment
+      # - name: Build + test
+      #   run: stack test --coverage
 
       - name: Check that Cabal file was generated
         run: git diff --exit-code '*.cabal'
