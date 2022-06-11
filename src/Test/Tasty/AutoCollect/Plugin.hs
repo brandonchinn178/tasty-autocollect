@@ -8,25 +8,38 @@ import Control.Monad ((>=>))
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Char (toLower)
-import Data.Either (lefts)
 import Data.Foldable (toList)
 import Data.List (sortOn, stripPrefix)
-import Data.Maybe (listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import GHC.Hs (
   GhcPs,
+  GRHS (..),
+  GRHSs (..),
   HsBindLR (..),
   HsDecl (..),
+  HsExpr (..),
   HsImplicitBndrs (..),
+  HsLocalBindsLR (..),
+  HsMatchContext (..),
   HsModule (..),
+  HsPatSigType (..),
+  HsTupArg (..),
   HsType (..),
   HsWildCardBndrs (..),
   IE (..),
   IEWrappedName (..),
   LHsDecl,
+  LHsExpr,
+  LHsLocalBinds,
   LHsSigWcType,
+  LHsType,
+  LPat,
+  Match (..),
+  MatchGroup (..),
   NoExtField (..),
+  Pat (..),
   Sig (..),
  )
 import GHC.Plugins
@@ -98,8 +111,8 @@ module MyTest (
   bar,
 ) where
 
-test_testCase :: <type>
-test_testCase <name> <other args> = <test>
+test_<tester> :: <type>
+test_<tester> <name> <other args> = <test>
 @
 
 to the equivalent of
@@ -115,8 +128,7 @@ tests :: [TestTree]
 tests = [test1]
 
 test1 :: TestTree
-test1 =
-  testCase <name> <other args> (<test> :: <type>)
+test1 = <tester> <name> <other args> (<test> :: <type>)
 @
 -}
 transformTestModule :: HsParsedModule -> HsParsedModule
@@ -142,49 +154,109 @@ transformTestModule parsedModl = parsedModl{hpm_module = updateModule <$> hpm_mo
       case parseAutoCollectAnn loc of
         Just AutoCollectTestExport -> Just (getLoc loc)
         _ -> Nothing
-    exportIE = IEVar NoExtField $ generatedLoc $ IEName testListIdentifier
-
-    -- If the given declaration is a test, return Left with the converted test, or otherwise
-    -- Right with the unmodified declaration
-    convertTest :: LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
-    convertTest loc =
-      case unLoc loc of
-        SigD extS (TypeSig extT [funcName] ty)
-          | Just tester <- getTester funcName -> do
-              testName <- getNextTestName
-              setLastSeenSig
-                SigInfo
-                  { testerName = tester
-                  , testName
-                  , testType = ty
-                  }
-              let testTreeType = HsWC NoExtField $ HsIB NoExtField $ generatedLoc $ HsTyVar NoExtField NotPromoted $ generatedLoc tastyTestTreeName
-              let newSig = SigD extS $ TypeSig extT [testName] testTreeType
-              pure (newSig <$ loc)
-        ValD extV (FunBind extF funcName _ _)
-          | Just tester <- getTester funcName -> do
-              (testName, mType) <- getLastSeenSig >>= \case
-                Nothing -> do
-                  testName <- getNextTestName
-                  pure (testName, Nothing)
-                Just SigInfo{..} -> pure (testName, Just testType)
-              -- TODO: error if MatchGroup is not exactly one item (only support one func clause)
-              -- TODO: convert match [tester ...args = body] into expression [tester ...args body]
-              -- TODO: if lastSeenSig has type, set type of [body]
-              let testBody = _
-              let newFunc = ValD extV (FunBind extF testName testBody [])
-              pure (newFunc <$ loc)
-        _ -> pure loc
+    exportIE = IEVar NoExtField $ genLoc $ IEName testListName
 
     -- Generate the `tests` list
     mkTestsList :: [Located RdrName] -> LHsDecl GhcPs
-    mkTestsList _ =
-      let testsList = _ -- TODO
-       in generatedLoc $ ValD NoExtField $ FunBind NoExtField testListIdentifier testsList []
+    mkTestsList testNames =
+      let testList = ExplicitList NoExtField Nothing $ map (genLoc . HsVar NoExtField) testNames
+       in genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
+
+{- |
+If the given declaration is a test, return the converted test, or otherwise
+return it unmodified
+-}
+convertTest :: LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
+convertTest loc =
+  case unLoc loc of
+    -- e.g. test_testCase :: Assertion
+    -- =>   test1 :: TestTree
+    SigD extS (TypeSig extT [funcName] ty)
+      | Just tester <- getTester funcName -> do
+          testName <- getNextTestName
+          setLastSeenSig
+            SigInfo
+              { testerName = tester
+              , testName
+              , testType = ty
+              }
+          let testTreeType = genHsWC $ genLoc $ HsTyVar NoExtField NotPromoted $ genLoc tastyTestTreeName
+          let newSig = SigD extS $ TypeSig extT [testName] testTreeType
+          pure (newSig <$ loc)
+    -- e.g. test_testCase "test name" = <body>
+    -- =>   test1 = testCase "test name" (<body> :: Assertion)
+    ValD _ (FunBind _ funcName funcMatchGroup _)
+      | Just tester <- getTester funcName -> do
+          (testName, mType) <- getLastSeenSig >>= \case
+            Nothing -> do
+              testName <- getNextTestName
+              pure (testName, Nothing)
+            Just SigInfo{..} -> pure (testName, Just testType)
+
+          let MG{mg_alts = L _ funcMatches} = funcMatchGroup
+          funcMatch <-
+            case funcMatches of
+              [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
+              [L _ funcMatch] -> pure funcMatch
+              _ ->
+                autocollectError . unlines $
+                  [ "Test should only have one defined function."
+                  , "Found multiple definitions starting at " ++ getSpanLine funcName
+                  ]
+
+          let Match{m_pats = funcArgs, m_grhss = GRHSs{grhssGRHSs, grhssLocalBinds = whereClause}} = funcMatch
+          funcBody <-
+            case grhssGRHSs of
+              [L _ (GRHS _ [] funcBody)] -> pure funcBody
+              _ ->
+                autocollectError . unlines $
+                  [ "Test should have no guards."
+                  , "Found guards at " ++ getSpanLine funcName
+                  ]
+
+          -- tester funcArgs (funcBody :: mType)
+          let testBody =
+                foldr1 (\f x -> genLoc $ HsApp NoExtField f x) . concat $
+                  [ [genLoc $ HsVar NoExtField $ mkRdrName tester]
+                  , map patternToExpr funcArgs
+                  , case mType of
+                      Nothing -> [funcBody]
+                      Just ty -> [genLoc $ ExprWithTySig NoExtField funcBody ty]
+                  ]
+
+          pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
+    -- anything else leave unmodified
+    _ -> pure loc
+
+{- |
+Convert the given pattern to the expression that it would represent
+if it were in an expression context.
+-}
+patternToExpr :: LPat GhcPs -> LHsExpr GhcPs
+patternToExpr lpat =
+  case unLoc lpat of
+    WildPat{} -> unsupported "wildcard patterns"
+    VarPat _ name -> error "VarPat" name
+    LazyPat{} -> unsupported "lazy patterns"
+    AsPat{} -> unsupported "as patterns"
+    ParPat _ p -> genLoc $ HsPar NoExtField $ patternToExpr p
+    BangPat{} -> unsupported "bang patterns"
+    ListPat _ ps -> genLoc $ ExplicitList NoExtField Nothing $ map patternToExpr ps
+    TuplePat _ ps boxity -> genLoc $ ExplicitTuple NoExtField (map (genLoc . Present NoExtField . patternToExpr) ps) boxity
+    SumPat{} -> unsupported "anonymous sum patterns"
+    ConPat{} -> unsupported "constructor patterns" -- TODO: add support
+    ViewPat{} -> unsupported "view patterns"
+    SplicePat _ splice -> genLoc $ HsSpliceE NoExtField splice
+    LitPat _ lit -> error "LitPat" lit
+    NPat _ lit _ _ -> error "NPat" lit
+    NPlusKPat{} -> unsupported "n+k patterns"
+    SigPat _ p (HsPS _ ty) -> genLoc $ ExprWithTySig NoExtField (patternToExpr p) $ genHsWC (genLoc (unLoc ty))
+  where
+    unsupported label = autocollectError $ label ++ " unsupported as test argument at " ++ getSpanLine lpat
 
 -- | Identifier for the generated `tests` list.
-testListIdentifier :: Located RdrName
-testListIdentifier = mkRdrName "tasty_autocollect_tests"
+testListName :: Located RdrName
+testListName = mkRdrName testListIdentifier
 
 getTester :: Located RdrName -> Maybe String
 getTester = stripPrefix "test_" . fromRdrName
@@ -192,6 +264,14 @@ getTester = stripPrefix "test_" . fromRdrName
 -- | RdrName for 'Test.Tasty.TestTree'
 tastyTestTreeName :: RdrName
 tastyTestTreeName = mkRdrQual (mkModuleName "Test.Tasty") (mkOccName NameSpace.varName "TestTree")
+
+autocollectError :: String -> a
+autocollectError msg =
+  pgmError . unlines $
+    [ ""
+    , "******************** tasty-autocollect failure ********************"
+    , msg
+    ]
 
 {----- Test converter monad -----}
 
@@ -231,23 +311,52 @@ setLastSeenSig info = State.modify' $ \state -> state{lastSeenSig = Just info}
 getNextTestName :: ConvertTestM (Located RdrName)
 getNextTestName = do
   state@ConvertTestState{allTests} <- State.get
-  let nextTestName = mkRdrName $ "tasty_autocollect_test_" ++ show (length allTests)
+  let nextTestName = mkRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName
 
+{----- Identifiers -----}
 
-{----- GenLocated utilities -----}
+testListIdentifier :: String
+testListIdentifier = "tasty_autocollect_tests"
 
-generatedLoc :: e -> Located e
-generatedLoc = L generatedSrcSpan
+testIdentifier :: Int -> String
+testIdentifier x = "tasty_autocollect_test_" ++ show x
+
+{----- Builders -----}
+
+genHsWC :: LHsType GhcPs -> LHsSigWcType GhcPs
+genHsWC = HsWC NoExtField . HsIB NoExtField
+
+-- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
+genFuncDecl :: Located RdrName ->  [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
+genFuncDecl funcName funcArgs funcBody mFuncWhere =
+  (\body -> ValD NoExtField $ FunBind NoExtField funcName body [])
+    . (\match -> MG NoExtField (genLoc [genLoc match]) Generated)
+    . Match NoExtField (FunRhs funcName Prefix NoSrcStrict) funcArgs
+    . (\grhs -> GRHSs NoExtField [genLoc grhs] funcWhere)
+    $ GRHS NoExtField [] funcBody
+  where
+    funcWhere = fromMaybe (genLoc $ EmptyLocalBinds NoExtField) mFuncWhere
+
+{----- Located utilities -----}
+
+genLoc :: e -> Located e
+genLoc = L generatedSrcSpan
 
 firstLocatedWhere :: Ord l => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
 firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 
+getSpanLine :: Located a -> String
+getSpanLine loc =
+  case srcSpanStart $ getLoc loc of
+    RealSrcLoc srcLoc _ -> "line " ++ show (srcLocLine srcLoc)
+    UnhelpfulLoc s -> unpackFS s
+
 {----- Name utilities -----}
 
 mkRdrName :: String -> Located RdrName
-mkRdrName = generatedLoc . mkRdrUnqual . mkOccName NameSpace.varName
+mkRdrName = genLoc . mkRdrUnqual . mkOccName NameSpace.varName
 
 fromRdrName :: Located RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
