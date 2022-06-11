@@ -1,24 +1,26 @@
 {- AUTOCOLLECT.TEST -}
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module Examples (
   {- AUTOCOLLECT.TEST.export -}
 ) where
 
--- import Test.Tasty.Golden
+import Data.ByteString.Lazy (ByteString)
+import Test.Tasty.Golden
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-testCase :: Assertion
-testCase "Addition" = do
+test_testCase :: Assertion
+test_testCase "Addition" = do
   1 + 1 @?= 2
   2 + 2 @?= 4
 
-testCase :: Assertion
-testCase "Reverse" = reverse [1, 2, 3] @?= [3, 2, 1]
+test_testCase :: Assertion
+test_testCase "Reverse" = reverse [1, 2, 3] @?= [3, 2, 1]
 
-testProperty :: [Int] -> Property
-testProperty "reverse . reverse === id" = \xs -> (reverse . reverse) xs === id xs
+test_testProperty :: [Int] -> Property
+test_testProperty "reverse . reverse === id" = \xs -> (reverse . reverse) xs === id xs
 
--- goldenVsString :: IO ByteString
--- goldenVsString "Some test" "some_test.golden" = do
---   ...
+test_goldenVsString :: IO ByteString
+test_goldenVsString "Example golden test" "example.golden" = pure "example"
