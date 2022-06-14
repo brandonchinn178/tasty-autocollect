@@ -32,7 +32,7 @@ library:
     - base >= 4.14 && < 5
     - containers >= 0.6.4.1 && < 0.7
     - ghc >= 8.10 && < 9.3
-    - transformers >= 0.5.6.2
+    - transformers >= 0.5.6.2 && < 1
 
 tests:
   tasty-autocollect-tests:
@@ -42,6 +42,7 @@ tests:
     dependencies:
       - base
       - bytestring
+      - tasty
       - tasty-autocollect
       - tasty-golden
       - tasty-hunit

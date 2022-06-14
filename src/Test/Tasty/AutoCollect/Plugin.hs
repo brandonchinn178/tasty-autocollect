@@ -9,7 +9,7 @@ import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Char (toLower)
 import Data.Foldable (toList)
-import Data.List (sortOn, stripPrefix)
+import Data.List (intercalate, sortOn, stripPrefix)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -18,6 +18,7 @@ import GHC.Hs (
   GRHS (..),
   GRHSs (..),
   HsBindLR (..),
+  HsConDetails (..),
   HsDecl (..),
   HsExpr (..),
   HsImplicitBndrs (..),
@@ -30,6 +31,8 @@ import GHC.Hs (
   HsWildCardBndrs (..),
   IE (..),
   IEWrappedName (..),
+  ImportDecl (..),
+  ImportDeclQualifiedStyle (..),
   LHsDecl,
   LHsExpr,
   LHsLocalBinds,
@@ -48,13 +51,14 @@ import GHC.Parser.Annotation (
   ApiAnns (..),
   getAnnotationComments,
  )
-import qualified GHC.Types.Name.Occurrence as NameSpace (varName)
+import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 
 plugin :: Plugin
 plugin =
   defaultPlugin
     { dynflagsPlugin = \_ df ->
         pure $ df `gopt_set` Opt_KeepRawTokenStream
+    , pluginRecompile = purePlugin
     , parsedResultAction = \_ _ modl -> do
         return $
           case getModuleType modl of
@@ -140,7 +144,8 @@ transformTestModule parsedModl = parsedModl{hpm_module = updateModule <$> hpm_mo
       let (decls, testNames) = runConvertTestM $ mapM convertTest $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
-            , hsmodDecls = mkTestsList testNames : decls
+            , hsmodImports = testTreeImport : hsmodImports modl
+            , hsmodDecls = mkTestsList testNames ++ decls
             }
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
@@ -156,11 +161,30 @@ transformTestModule parsedModl = parsedModl{hpm_module = updateModule <$> hpm_mo
         _ -> Nothing
     exportIE = IEVar NoExtField $ genLoc $ IEName testListName
 
+    -- Import 'Test.Tasty.TestTree'
+    testTreeImport =
+      genLoc $
+        ImportDecl
+          { ideclExt = NoExtField
+          , ideclSourceSrc = NoSourceText
+          , ideclName = genLoc $ mkModuleName "Test.Tasty"
+          , ideclPkgQual = Nothing
+          , ideclSource = NotBoot
+          , ideclSafe = False
+          , ideclQualified = QualifiedPre -- TODO: make qualified
+          , ideclImplicit = False
+          , ideclAs = Just (genLoc testTastyModule)
+          , ideclHiding = Nothing
+          }
+
     -- Generate the `tests` list
-    mkTestsList :: [Located RdrName] -> LHsDecl GhcPs
+    mkTestsList :: [Located RdrName] -> [LHsDecl GhcPs]
     mkTestsList testNames =
       let testList = ExplicitList NoExtField Nothing $ map (genLoc . HsVar NoExtField) testNames
-       in genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
+       in
+        [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField testTreeType
+        , genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
+        ]
 
 {- |
 If the given declaration is a test, return the converted test, or otherwise
@@ -171,7 +195,7 @@ convertTest loc =
   case unLoc loc of
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: TestTree
-    SigD extS (TypeSig extT [funcName] ty)
+    SigD _ (TypeSig _ [funcName] ty)
       | Just tester <- getTester funcName -> do
           testName <- getNextTestName
           setLastSeenSig
@@ -180,18 +204,14 @@ convertTest loc =
               , testName
               , testType = ty
               }
-          let testTreeType = genHsWC $ genLoc $ HsTyVar NoExtField NotPromoted $ genLoc tastyTestTreeName
-          let newSig = SigD extS $ TypeSig extT [testName] testTreeType
-          pure (newSig <$ loc)
+          pure (genFuncSig testName testTreeType <$ loc)
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = testCase "test name" (<body> :: Assertion)
     ValD _ (FunBind _ funcName funcMatchGroup _)
       | Just tester <- getTester funcName -> do
-          (testName, mType) <- getLastSeenSig >>= \case
-            Nothing -> do
-              testName <- getNextTestName
-              pure (testName, Nothing)
-            Just SigInfo{..} -> pure (testName, Just testType)
+          (testName, funcBodyType) <- getLastSeenSig >>= \case
+            Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
+            Just SigInfo{..} -> pure (testName, testType)
 
           let MG{mg_alts = L _ funcMatches} = funcMatchGroup
           funcMatch <-
@@ -200,8 +220,8 @@ convertTest loc =
               [L _ funcMatch] -> pure funcMatch
               _ ->
                 autocollectError . unlines $
-                  [ "Test should only have one defined function."
-                  , "Found multiple definitions starting at " ++ getSpanLine funcName
+                  [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcMatches)
+                  , "Did you forget to add a type annotation for a test?"
                   ]
 
           let Match{m_pats = funcArgs, m_grhss = GRHSs{grhssGRHSs, grhssLocalBinds = whereClause}} = funcMatch
@@ -216,12 +236,10 @@ convertTest loc =
 
           -- tester funcArgs (funcBody :: mType)
           let testBody =
-                foldr1 (\f x -> genLoc $ HsApp NoExtField f x) . concat $
+                exprApply . concat $
                   [ [genLoc $ HsVar NoExtField $ mkRdrName tester]
                   , map patternToExpr funcArgs
-                  , case mType of
-                      Nothing -> [funcBody]
-                      Just ty -> [genLoc $ ExprWithTySig NoExtField funcBody ty]
+                  , [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
                   ]
 
           pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
@@ -244,11 +262,15 @@ patternToExpr lpat =
     ListPat _ ps -> genLoc $ ExplicitList NoExtField Nothing $ map patternToExpr ps
     TuplePat _ ps boxity -> genLoc $ ExplicitTuple NoExtField (map (genLoc . Present NoExtField . patternToExpr) ps) boxity
     SumPat{} -> unsupported "anonymous sum patterns"
-    ConPat{} -> unsupported "constructor patterns" -- TODO: add support
+    ConPat _ conName conDetails ->
+      case conDetails of
+        PrefixCon args -> exprApply $ genLoc (HsVar NoExtField conName) : map patternToExpr args
+        RecCon fields -> genLoc $ RecordCon NoExtField conName $ patternToExpr <$> fields
+        InfixCon l r -> exprApply $ genLoc (HsVar NoExtField conName) : map patternToExpr [l, r]
     ViewPat{} -> unsupported "view patterns"
     SplicePat _ splice -> genLoc $ HsSpliceE NoExtField splice
-    LitPat _ lit -> error "LitPat" lit
-    NPat _ lit _ _ -> error "NPat" lit
+    LitPat _ lit -> genLoc $ HsLit NoExtField lit
+    NPat _ lit _ _ -> genLoc $ HsOverLit NoExtField (unLoc lit)
     NPlusKPat{} -> unsupported "n+k patterns"
     SigPat _ p (HsPS _ ty) -> genLoc $ ExprWithTySig NoExtField (patternToExpr p) $ genHsWC (genLoc (unLoc ty))
   where
@@ -261,9 +283,15 @@ testListName = mkRdrName testListIdentifier
 getTester :: Located RdrName -> Maybe String
 getTester = stripPrefix "test_" . fromRdrName
 
--- | RdrName for 'Test.Tasty.TestTree'
-tastyTestTreeName :: RdrName
-tastyTestTreeName = mkRdrQual (mkModuleName "Test.Tasty") (mkOccName NameSpace.varName "TestTree")
+-- | ModuleName for 'Test.Tasty', renamed to ensure we're using the 'TestTree' we're importing ad-hoc.
+testTastyModule :: ModuleName
+testTastyModule = mkModuleName "TastyAutoCollect.Test.Tasty"
+
+testTreeType :: LHsType GhcPs
+testTreeType =
+  genLoc . HsTyVar NoExtField NotPromoted $
+    genLoc . mkRdrQual testTastyModule $
+      mkOccName NameSpace.tcName "TestTree"
 
 autocollectError :: String -> a
 autocollectError msg =
@@ -328,6 +356,13 @@ testIdentifier x = "tasty_autocollect_test_" ++ show x
 genHsWC :: LHsType GhcPs -> LHsSigWcType GhcPs
 genHsWC = HsWC NoExtField . HsIB NoExtField
 
+genFuncSig :: Located RdrName -> LHsType GhcPs -> HsDecl GhcPs
+genFuncSig funcName funcType =
+  SigD NoExtField
+    . TypeSig NoExtField [funcName]
+    . genHsWC
+    $ funcType
+
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
 genFuncDecl :: Located RdrName ->  [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
@@ -338,6 +373,10 @@ genFuncDecl funcName funcArgs funcBody mFuncWhere =
     $ GRHS NoExtField [] funcBody
   where
     funcWhere = fromMaybe (genLoc $ EmptyLocalBinds NoExtField) mFuncWhere
+
+-- | Apply the given [f, x1, x2, x3] as `(((f x1) x2) x3)`.
+exprApply :: [LHsExpr GhcPs] -> LHsExpr GhcPs
+exprApply = foldl1 (\f x -> genLoc $ HsApp NoExtField f x)
 
 {----- Located utilities -----}
 

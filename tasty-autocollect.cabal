@@ -37,7 +37,7 @@ library
       base >=4.14 && <5
     , containers >=0.6.4.1 && <0.7
     , ghc >=8.10 && <9.3
-    , transformers >=0.5.6.2
+    , transformers >=0.5.6.2 && <1
   if impl(ghc >= 8.0)
     ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   if impl(ghc < 8.8)
@@ -57,6 +57,7 @@ test-suite tasty-autocollect-tests
   build-depends:
       base
     , bytestring
+    , tasty
     , tasty-autocollect
     , tasty-golden
     , tasty-hunit
