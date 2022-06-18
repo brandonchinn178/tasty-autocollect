@@ -6,7 +6,6 @@
 module Test.Tasty.AutoCollect.Plugin (plugin) where
 
 import Control.Monad ((>=>))
-import Data.Char (toLower)
 import GHC.Driver.Main (getHscEnv)
 import GHC.Plugins hiding (getHscEnv)
 import GHC.Parser.Annotation (
@@ -15,6 +14,7 @@ import GHC.Parser.Annotation (
  )
 import Test.Tasty (TestTree)
 
+import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.ConvertTest
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.GHC
@@ -39,24 +39,6 @@ plugin =
             Nothing -> modl
     }
 
-{----- AutoCollectAnn -----}
-
--- | A tasty-autocollect annotation.
-data AutoCollectAnn
-  = AutoCollectMain
-  | AutoCollectTest
-  | AutoCollectTestExport
-
-parseAutoCollectAnn :: RealLocated AnnotationComment -> Maybe AutoCollectAnn
-parseAutoCollectAnn = \case
-  L _ (AnnBlockComment s) ->
-    case map toLower s of
-      "{- autocollect.main -}" -> Just AutoCollectMain
-      "{- autocollect.test -}" -> Just AutoCollectTest
-      "{- autocollect.test.export -}" -> Just AutoCollectTestExport
-      _ -> Nothing
-  _ -> Nothing
-
 {----- ModuleType -----}
 
 -- | The type of module being compiled.
@@ -66,10 +48,11 @@ getModuleType :: HsParsedModule -> Maybe ModuleType
 getModuleType = firstLocatedWhere parseModuleType . apiAnnRogueComments . hpm_annotations
 
 parseModuleType :: RealLocated AnnotationComment -> Maybe ModuleType
-parseModuleType = parseAutoCollectAnn >=> \case
-  AutoCollectMain -> Just ModuleMain
-  AutoCollectTest -> Just ModuleTest
-  _ -> Nothing
+parseModuleType = getBlockComment >=> \case
+  s
+    | isMainComment s -> Just ModuleMain
+    | isTestComment s -> Just ModuleTest
+    | otherwise -> Nothing
 
 {----- Transform modules -----}
 

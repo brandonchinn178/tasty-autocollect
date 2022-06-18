@@ -8,7 +8,6 @@ module Test.Tasty.AutoCollect.ConvertTest (
 
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
-import Data.Char (toLower)
 import Data.Foldable (toList)
 import Data.List (intercalate, stripPrefix)
 import Data.Sequence (Seq)
@@ -40,29 +39,12 @@ import GHC.Hs (
  )
 import GHC.Plugins
 import GHC.Parser.Annotation (
-  AnnotationComment (..),
   getAnnotationComments,
  )
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.GHC
-
--- | A tasty-autocollect annotation.
-data AutoCollectAnn
-  = AutoCollectMain
-  | AutoCollectTest
-  | AutoCollectTestExport
-
-parseAutoCollectAnn :: RealLocated AnnotationComment -> Maybe AutoCollectAnn
-parseAutoCollectAnn = \case
-  L _ (AnnBlockComment s) ->
-    case map toLower s of
-      "{- autocollect.main -}" -> Just AutoCollectMain
-      "{- autocollect.test -}" -> Just AutoCollectTest
-      "{- autocollect.test.export -}" -> Just AutoCollectTestExport
-      _ -> Nothing
-  _ -> Nothing
 
 {- |
 Transforms a test module of the form
@@ -115,9 +97,9 @@ transformTestModule testTreeName parsedModl = parsedModl{hpm_module = updateModu
       | otherwise =
           loc
     getTestExportAnnSrcSpan loc =
-      case parseAutoCollectAnn loc of
-        Just AutoCollectTestExport -> Just (getLoc loc)
-        _ -> Nothing
+      if maybe False isTestExportComment (getBlockComment loc)
+        then Just (getLoc loc)
+        else Nothing
     exportIE = IEVar NoExtField $ genLoc $ IEName testListName
 
     -- Generate the `tests` list

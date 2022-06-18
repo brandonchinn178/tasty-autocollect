@@ -1,4 +1,10 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Test.Tasty.AutoCollect.GHC (
+  -- * Parsers
+  getBlockComment,
+
   -- * Builders
   genHsWC,
   genFuncSig,
@@ -16,17 +22,28 @@ module Test.Tasty.AutoCollect.GHC (
   thNameToGhcNameIO,
 ) where
 
+import Control.Monad ((<=<))
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import qualified Data.Text as Text
 import GHC.IORef (IORef, newIORef)
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Hs
+import GHC.Parser.Annotation (AnnotationComment (..))
 import GHC.Plugins
 import GHC.Settings (ToolSettings (..))
 import GHC.Types.Name.Cache (NameCache)
 import qualified GHC.Types.Name.Occurrence as NameSpace (varName)
 import qualified Language.Haskell.TH as TH
 import System.IO.Unsafe (unsafePerformIO)
+
+{----- Parsers -----}
+
+getBlockComment :: RealLocated AnnotationComment -> Maybe String
+getBlockComment = \case
+  L _ (AnnBlockComment s) ->
+    fmap (Text.unpack . Text.strip) . Text.stripSuffix "-}" <=< Text.stripPrefix "{-" . Text.pack $ s
+  _ -> Nothing
 
 {----- Builders -----}
 
