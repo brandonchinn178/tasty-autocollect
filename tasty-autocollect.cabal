@@ -27,6 +27,10 @@ source-repository head
 library
   exposed-modules:
       Test.Tasty.AutoCollect
+      Test.Tasty.AutoCollect.Constants
+      Test.Tasty.AutoCollect.ConvertTest
+      Test.Tasty.AutoCollect.Error
+      Test.Tasty.AutoCollect.GHC
       Test.Tasty.AutoCollect.Plugin
   other-modules:
       Paths_tasty_autocollect
