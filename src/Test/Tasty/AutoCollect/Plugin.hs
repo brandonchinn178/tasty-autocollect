@@ -32,11 +32,11 @@ plugin =
             thNameToGhcNameIO nameCache ''TestTree >>=
               maybe (autocollectError "Could not get Name for TestTree") return
 
-        return $
+        liftIO $
           case getModuleType modl of
             Just ModuleMain -> transformMainModule modl
             Just ModuleTest -> transformTestModule testTreeName modl
-            Nothing -> modl
+            Nothing -> pure modl
     }
 
 {----- ModuleType -----}
@@ -56,5 +56,5 @@ parseModuleType = getBlockComment >=> \case
 
 {----- Transform modules -----}
 
-transformMainModule :: HsParsedModule -> HsParsedModule
-transformMainModule = trace "transformMainModule"
+transformMainModule :: HsParsedModule -> IO HsParsedModule
+transformMainModule = trace "transformMainModule" . pure
