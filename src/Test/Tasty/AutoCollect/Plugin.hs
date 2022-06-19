@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Test.Tasty.AutoCollect.Plugin (plugin) where
 
@@ -12,11 +11,10 @@ import GHC.Parser.Annotation (
   AnnotationComment (..),
   ApiAnns (..),
  )
-import Test.Tasty (TestTree)
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.ConvertTest
-import Test.Tasty.AutoCollect.Error
+import Test.Tasty.AutoCollect.ExternalNames
 import Test.Tasty.AutoCollect.GHC
 
 plugin :: Plugin
@@ -26,16 +24,13 @@ plugin =
         pure $ df `gopt_set` Opt_KeepRawTokenStream
     , pluginRecompile = purePlugin
     , parsedResultAction = \_ _ modl -> do
-        nameCache <- hsc_NC <$> getHscEnv
-        testTreeName <-
-          liftIO $
-            thNameToGhcNameIO nameCache ''TestTree >>=
-              maybe (autocollectError "Could not get Name for TestTree") return
+        env <- getHscEnv
+        names <- liftIO $ loadExternalNames env
 
         liftIO $
           case getModuleType modl of
             Just ModuleMain -> transformMainModule modl
-            Just ModuleTest -> transformTestModule testTreeName modl
+            Just ModuleTest -> transformTestModule names modl
             Nothing -> pure modl
     }
 

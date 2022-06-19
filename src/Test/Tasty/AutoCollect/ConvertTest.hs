@@ -44,6 +44,7 @@ import GHC.Parser.Annotation (
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
+import Test.Tasty.AutoCollect.ExternalNames
 import Test.Tasty.AutoCollect.GHC
 
 {- |
@@ -77,13 +78,13 @@ test1 :: TestTree
 test1 = <tester> <name> <other args> (<test> :: <type>)
 @
 -}
-transformTestModule :: Name -> HsParsedModule -> IO HsParsedModule
-transformTestModule testTreeName parsedModl = pure parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
+transformTestModule :: ExternalNames -> HsParsedModule -> IO HsParsedModule
+transformTestModule names parsedModl = pure parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     getCommentsAt = getAnnotationComments (hpm_annotations parsedModl)
 
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ mapM (convertTest testTreeName) $ hsmodDecls modl
+      let (decls, testNames) = runConvertTestM $ mapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
             , hsmodDecls = mkTestsList testNames ++ decls
@@ -107,7 +108,7 @@ transformTestModule testTreeName parsedModl = pure parsedModl{hpm_module = updat
     mkTestsList testNames =
       let testList = ExplicitList NoExtField Nothing $ map (genLoc . HsVar NoExtField) testNames
        in
-        [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField $ toTestTreeType testTreeName
+        [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField $ getTestTreeType names
         , genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
         ]
 
@@ -115,8 +116,8 @@ transformTestModule testTreeName parsedModl = pure parsedModl{hpm_module = updat
 If the given declaration is a test, return the converted test, or otherwise
 return it unmodified
 -}
-convertTest :: Name -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
-convertTest testTreeName loc =
+convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
+convertTest names loc =
   case unLoc loc of
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: TestTree
@@ -129,7 +130,7 @@ convertTest testTreeName loc =
               , testName
               , testType = ty
               }
-          pure (genFuncSig testName (toTestTreeType testTreeName) <$ loc)
+          pure (genFuncSig testName (getTestTreeType names) <$ loc)
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = testCase "test name" (<body> :: Assertion)
     ValD _ (FunBind _ funcName funcMatchGroup _)
@@ -208,8 +209,8 @@ testListName = mkRdrName testListIdentifier
 getTester :: Located RdrName -> Maybe String
 getTester = stripPrefix "test_" . fromRdrName
 
-toTestTreeType :: Name -> LHsType GhcPs
-toTestTreeType = genLoc . HsTyVar NoExtField NotPromoted . genLoc . getRdrName
+getTestTreeType :: ExternalNames -> LHsType GhcPs
+getTestTreeType = genLoc . HsTyVar NoExtField NotPromoted . genLoc . getRdrName . name_TestTree
 
 {----- Test converter monad -----}
 

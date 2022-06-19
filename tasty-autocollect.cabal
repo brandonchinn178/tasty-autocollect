@@ -30,6 +30,7 @@ library
       Test.Tasty.AutoCollect.Constants
       Test.Tasty.AutoCollect.ConvertTest
       Test.Tasty.AutoCollect.Error
+      Test.Tasty.AutoCollect.ExternalNames
       Test.Tasty.AutoCollect.GHC
       Test.Tasty.AutoCollect.Plugin
   other-modules:
