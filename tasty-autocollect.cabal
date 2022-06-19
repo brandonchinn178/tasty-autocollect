@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Test.Tasty.AutoCollect
+      Test.Tasty.AutoCollect.Config
       Test.Tasty.AutoCollect.Constants
       Test.Tasty.AutoCollect.ConvertTest
       Test.Tasty.AutoCollect.Error
