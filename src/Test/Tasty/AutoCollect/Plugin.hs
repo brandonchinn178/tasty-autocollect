@@ -14,6 +14,7 @@ import GHC.Parser.Annotation (
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.ConvertMain
 import Test.Tasty.AutoCollect.ConvertTest
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.ExternalNames
@@ -25,13 +26,13 @@ plugin =
     { dynflagsPlugin = \_ df ->
         pure $ df `gopt_set` Opt_KeepRawTokenStream
     , pluginRecompile = purePlugin
-    , parsedResultAction = \_ _ modl -> do
+    , parsedResultAction = \_ ms modl -> do
         env <- getHscEnv
         names <- liftIO $ loadExternalNames env
 
         liftIO $
           case getModuleType modl of
-            Just (ModuleMain _) -> transformMainModule modl
+            Just (ModuleMain cfg) -> transformMainModule cfg names ms modl
             Just ModuleTest -> transformTestModule names modl
             Nothing -> pure modl
     }
@@ -58,8 +59,3 @@ parseModuleType loc = do
           pure ModuleTest
       | otherwise ->
           Nothing
-
-{----- Transform modules -----}
-
-transformMainModule :: HsParsedModule -> IO HsParsedModule
-transformMainModule = trace "transformMainModule" . pure
