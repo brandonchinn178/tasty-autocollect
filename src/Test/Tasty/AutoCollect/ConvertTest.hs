@@ -12,31 +12,7 @@ import Data.Foldable (toList)
 import Data.List (intercalate, stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import GHC.Hs (
-  GhcPs,
-  GRHS (..),
-  GRHSs (..),
-  HsBindLR (..),
-  HsConDetails (..),
-  HsDecl (..),
-  HsExpr (..),
-  HsModule (..),
-  HsPatSigType (..),
-  HsTupArg (..),
-  HsType (..),
-  IE (..),
-  IEWrappedName (..),
-  LHsDecl,
-  LHsExpr,
-  LHsSigWcType,
-  LHsType,
-  LPat,
-  Match (..),
-  MatchGroup (..),
-  NoExtField (..),
-  Pat (..),
-  Sig (..),
- )
+import GHC.Hs
 import GHC.Plugins
 import GHC.Parser.Annotation (
   getAnnotationComments,
@@ -160,13 +136,10 @@ convertTest names loc =
                   , "Found guards at " ++ getSpanLine funcName
                   ]
 
-          -- tester funcArgs (funcBody :: mType)
+          -- tester (...funcArgs) (funcBody :: mType)
           let testBody =
-                exprApply . concat $
-                  [ [genLoc $ HsVar NoExtField $ mkRdrName tester]
-                  , map patternToExpr funcArgs
-                  , [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
-                  ]
+                mkHsApps (genLoc $ HsVar NoExtField $ mkRdrName tester) $
+                  map patternToExpr funcArgs ++ [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
 
           pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
     -- anything else leave unmodified
@@ -190,15 +163,15 @@ patternToExpr lpat =
     SumPat{} -> unsupported "anonymous sum patterns"
     ConPat _ conName conDetails ->
       case conDetails of
-        PrefixCon args -> exprApply $ genLoc (HsVar NoExtField conName) : map patternToExpr args
+        PrefixCon args -> mkHsApps (genLoc (HsVar NoExtField conName)) $ map patternToExpr args
         RecCon fields -> genLoc $ RecordCon NoExtField conName $ patternToExpr <$> fields
-        InfixCon l r -> exprApply $ genLoc (HsVar NoExtField conName) : map patternToExpr [l, r]
+        InfixCon l r -> mkHsApps (genLoc (HsVar NoExtField conName)) $ map patternToExpr [l, r]
     ViewPat{} -> unsupported "view patterns"
     SplicePat _ splice -> genLoc $ HsSpliceE NoExtField splice
     LitPat _ lit -> genLoc $ HsLit NoExtField lit
     NPat _ lit _ _ -> genLoc $ HsOverLit NoExtField (unLoc lit)
     NPlusKPat{} -> unsupported "n+k patterns"
-    SigPat _ p (HsPS _ ty) -> genLoc $ ExprWithTySig NoExtField (patternToExpr p) $ genHsWC (genLoc (unLoc ty))
+    SigPat _ p (HsPS _ ty) -> genLoc $ ExprWithTySig NoExtField (patternToExpr p) $ mkLHsSigWcType (genLoc (unLoc ty))
   where
     unsupported label = autocollectError $ label ++ " unsupported as test argument at " ++ getSpanLine lpat
 

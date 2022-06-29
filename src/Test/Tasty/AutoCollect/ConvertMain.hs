@@ -6,9 +6,7 @@ module Test.Tasty.AutoCollect.ConvertMain (
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as Text
-import GHC.Hs (
-  HsModule (..),
- )
+import GHC.Hs
 import GHC.Plugins
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))

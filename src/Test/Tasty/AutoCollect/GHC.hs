@@ -6,10 +6,8 @@ module Test.Tasty.AutoCollect.GHC (
   getBlockComment,
 
   -- * Builders
-  genHsWC,
   genFuncSig,
   genFuncDecl,
-  exprApply,
 
   -- * Located utilities
   genLoc,
@@ -18,6 +16,7 @@ module Test.Tasty.AutoCollect.GHC (
 
   -- * Name utilities
   mkRdrName,
+  mkRdrNameType,
   fromRdrName,
   thNameToGhcNameIO,
 ) where
@@ -34,7 +33,7 @@ import GHC.Plugins
 import GHC.SysTools (initSysTools)
 import GHC.SysTools.BaseDir (findTopDir)
 import GHC.Types.Name.Cache (NameCache)
-import qualified GHC.Types.Name.Occurrence as NameSpace (varName)
+import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
 {----- Parsers -----}
@@ -47,30 +46,21 @@ getBlockComment = \case
 
 {----- Builders -----}
 
-genHsWC :: LHsType GhcPs -> LHsSigWcType GhcPs
-genHsWC = HsWC NoExtField . HsIB NoExtField
-
 genFuncSig :: Located RdrName -> LHsType GhcPs -> HsDecl GhcPs
 genFuncSig funcName funcType =
   SigD NoExtField
     . TypeSig NoExtField [funcName]
-    . genHsWC
+    . mkLHsSigWcType
     $ funcType
 
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
 genFuncDecl :: Located RdrName ->  [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
-  (\body -> ValD NoExtField $ FunBind NoExtField funcName body [])
-    . (\match -> MG NoExtField (genLoc [genLoc match]) Generated)
-    . Match NoExtField (FunRhs funcName Prefix NoSrcStrict) funcArgs
-    . (\grhs -> GRHSs NoExtField [genLoc grhs] funcWhere)
-    $ GRHS NoExtField [] funcBody
+  ValD NoExtField . mkFunBind Generated funcName $
+    [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
+    ]
   where
-    funcWhere = fromMaybe (genLoc $ EmptyLocalBinds NoExtField) mFuncWhere
-
--- | Apply the given [f, x1, x2, x3] as `(((f x1) x2) x3)`.
-exprApply :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-exprApply = foldl1 (\f x -> genLoc $ HsApp NoExtField f x)
+    funcWhere = fromMaybe (genLoc emptyLocalBinds) mFuncWhere
 
 {----- Located utilities -----}
 
@@ -90,6 +80,9 @@ getSpanLine loc =
 
 mkRdrName :: String -> Located RdrName
 mkRdrName = genLoc . mkRdrUnqual . mkOccName NameSpace.varName
+
+mkRdrNameType :: String -> Located RdrName
+mkRdrNameType = genLoc . mkRdrUnqual . mkOccName NameSpace.tcName
 
 fromRdrName :: Located RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
