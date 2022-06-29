@@ -39,11 +39,21 @@ library:
     - text >= 1.2.4.1 && < 3
     - transformers >= 0.5.6.2 && < 1
 
+executable:
+  source-dirs: exe
+  main: Preprocessor.hs
+  dependencies:
+    - base >= 4.14 && < 5
+    - tasty-autocollect
+    - text >= 1.2.4.1 && < 3
+
 tests:
   tasty-autocollect-tests:
     source-dirs: test
     main: Main.hs
-    ghc-options: -fplugin=Test.Tasty.AutoCollect
+    ghc-options: -F -pgmF=tasty-autocollect
+    build-tools:
+      - tasty-autocollect:tasty-autocollect
     dependencies:
       - base
       - bytestring

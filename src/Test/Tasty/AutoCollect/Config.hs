@@ -70,17 +70,17 @@ defaultConfig =
     , cfgStripSuffix = ""
     }
 
-parseConfig :: String -> Either String AutoCollectConfig
-parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Text.lines . Text.pack
+parseConfig :: Text -> Either Text AutoCollectConfig
+parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Text.lines
   where
     isIgnoredLine s = Text.null (Text.strip s) || ("#" `Text.isPrefixOf` s)
 
-    parseLine :: Text -> Either String (AutoCollectConfig -> AutoCollectConfig)
+    parseLine :: Text -> Either Text (AutoCollectConfig -> AutoCollectConfig)
     parseLine s = do
       (k, v) <-
         case Text.splitOn "=" s of
           [k, v] -> pure (Text.strip k, Text.strip v)
-          _ -> Left $ "Invalid configuration line: " ++ show s
+          _ -> Left $ "Invalid configuration line: " <> Text.pack (show s)
 
       case k of
         "suite_name" ->
@@ -96,23 +96,23 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
           pure $ \cfg -> cfg{cfgIngredientsOverride = override}
         "strip_suffix" ->
           pure $ \cfg -> cfg{cfgStripSuffix = Text.unpack v}
-        _ -> Left $ "Invalid configuration key: " ++ show k
+        _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
 
     resolve fs = compose fs defaultConfig
 
-parseGroupType :: Text -> Either String AutoCollectGroupType
+parseGroupType :: Text -> Either Text AutoCollectGroupType
 parseGroupType = \case
   "flat" -> pure AutoCollectGroupFlat
   "modules" -> pure AutoCollectGroupModules
   "tree" -> pure AutoCollectGroupTree
-  ty -> Left $ "Invalid group_type: " ++ show ty
+  ty -> Left $ "Invalid group_type: " <> Text.pack (show ty)
 
-parseBool :: Text -> Either String Bool
+parseBool :: Text -> Either Text Bool
 parseBool s =
   case Text.toLower s of
     "true" -> pure True
     "false" -> pure False
-    _ -> Left $ "Invalid bool: " ++ show s
+    _ -> Left $ "Invalid bool: " <> Text.pack (show s)
 
 {----- Utilities -----}
 

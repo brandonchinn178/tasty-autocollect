@@ -54,8 +54,8 @@ test1 :: TestTree
 test1 = <tester> <name> <other args> (<test> :: <type>)
 @
 -}
-transformTestModule :: ExternalNames -> HsParsedModule -> IO HsParsedModule
-transformTestModule names parsedModl = pure parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
+transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
+transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     getCommentsAt = getAnnotationComments (hpm_annotations parsedModl)
 
