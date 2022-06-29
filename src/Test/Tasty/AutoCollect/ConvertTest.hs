@@ -138,7 +138,7 @@ convertTest names loc =
 
           -- tester (...funcArgs) (funcBody :: mType)
           let testBody =
-                mkHsApps (genLoc $ HsVar NoExtField $ mkRdrName tester) $
+                mkHsApps (genLoc $ HsVar NoExtField $ mkLRdrName tester) $
                   map patternToExpr funcArgs ++ [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
 
           pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
@@ -177,7 +177,7 @@ patternToExpr lpat =
 
 -- | Identifier for the generated `tests` list.
 testListName :: Located RdrName
-testListName = mkRdrName testListIdentifier
+testListName = mkLRdrName testListIdentifier
 
 getTester :: Located RdrName -> Maybe String
 getTester = stripPrefix "test_" . fromRdrName
@@ -223,6 +223,6 @@ setLastSeenSig info = State.modify' $ \state -> state{lastSeenSig = Just info}
 getNextTestName :: ConvertTestM (Located RdrName)
 getNextTestName = do
   state@ConvertTestState{allTests} <- State.get
-  let nextTestName = mkRdrName $ testIdentifier (length allTests)
+  let nextTestName = mkLRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName

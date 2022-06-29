@@ -16,7 +16,9 @@ module Test.Tasty.AutoCollect.GHC (
 
   -- * Name utilities
   mkRdrName,
+  mkLRdrName,
   mkRdrNameType,
+  mkLRdrNameType,
   fromRdrName,
   thNameToGhcNameIO,
 ) where
@@ -78,11 +80,17 @@ getSpanLine loc =
 
 {----- Name utilities -----}
 
-mkRdrName :: String -> Located RdrName
-mkRdrName = genLoc . mkRdrUnqual . mkOccName NameSpace.varName
+mkRdrName :: String -> RdrName
+mkRdrName = mkRdrUnqual . mkOccName NameSpace.varName
 
-mkRdrNameType :: String -> Located RdrName
-mkRdrNameType = genLoc . mkRdrUnqual . mkOccName NameSpace.tcName
+mkLRdrName :: String -> Located RdrName
+mkLRdrName = genLoc . mkRdrName
+
+mkRdrNameType :: String -> RdrName
+mkRdrNameType = mkRdrUnqual . mkOccName NameSpace.tcName
+
+mkLRdrNameType :: String -> Located RdrName
+mkLRdrNameType = genLoc . mkRdrNameType
 
 fromRdrName :: Located RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
