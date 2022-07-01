@@ -15,16 +15,16 @@ import qualified Data.Text as Text
 
 -- | Configuration for generating the Main module, specified as a block comment.
 data AutoCollectConfig = AutoCollectConfig
-  { cfgSuiteName :: Maybe String
+  { cfgSuiteName :: Maybe Text
   -- ^ The name of the entire test suite
   , cfgGroupType :: AutoCollectGroupType
   -- ^ How tests should be grouped (defaults to "modules")
-  , cfgIngredients :: [String]
+  , cfgIngredients :: [Text]
   -- ^ A comma-separated list of extra tasty ingredients to include
   , cfgIngredientsOverride :: Bool
   -- ^ If true, 'cfgIngredients' overrides the default tasty ingredients;
   -- otherwise, they're prepended to the list of default ingredients (defaults to false)
-  , cfgStripSuffix :: String
+  , cfgStripSuffix :: Text
   -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
   -- a module @Foo.BarTest@ to @Foo.Bar@.
   }
@@ -84,18 +84,18 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
 
       case k of
         "suite_name" ->
-          pure $ \cfg -> cfg{cfgSuiteName = Just $ Text.unpack v}
+          pure $ \cfg -> cfg{cfgSuiteName = Just v}
         "group_type" -> do
           groupType <- parseGroupType v
           pure $ \cfg -> cfg{cfgGroupType = groupType}
         "ingredients" -> do
-          let ingredients = map (Text.unpack . Text.strip) . Text.splitOn "," $ v
+          let ingredients = map Text.strip . Text.splitOn "," $ v
           pure $ \cfg -> cfg{cfgIngredients = ingredients}
         "ingredients_override" -> do
           override <- parseBool v
           pure $ \cfg -> cfg{cfgIngredientsOverride = override}
         "strip_suffix" ->
-          pure $ \cfg -> cfg{cfgStripSuffix = Text.unpack v}
+          pure $ \cfg -> cfg{cfgStripSuffix = v}
         _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
 
     resolve fs = compose fs defaultConfig
