@@ -16,37 +16,37 @@ test_testCase "builds the correct tree" =
       , exists = False
       , subTrees =
           [ Tree
-            { fullPath = ["A"]
-            , exists = False
-            , subTrees =
-                [ Tree
-                    { fullPath = ["A", "B"]
-                    , exists = True
-                    , subTrees =
-                        [ Tree
-                            { fullPath = ["A", "B", "C"]
-                            , exists = True
-                            , subTrees = []
-                            }
-                        ]
-                    }
-                , Tree
-                    { fullPath = ["A", "C"]
-                    , exists = False
-                    , subTrees =
-                        [ Tree
-                            { fullPath = ["A", "C", "D"]
-                            , exists = True
-                            , subTrees = []
-                            }
-                        ]
-                    }
-                ]
-            }
-        , Tree
-            { fullPath = ["Z"]
-            , exists = True
-            , subTrees = []
-            }
-        ]
+              { fullPath = ["A"]
+              , exists = False
+              , subTrees =
+                  [ Tree
+                      { fullPath = ["A", "B"]
+                      , exists = True
+                      , subTrees =
+                          [ Tree
+                              { fullPath = ["A", "B", "C"]
+                              , exists = True
+                              , subTrees = []
+                              }
+                          ]
+                      }
+                  , Tree
+                      { fullPath = ["A", "C"]
+                      , exists = False
+                      , subTrees =
+                          [ Tree
+                              { fullPath = ["A", "C", "D"]
+                              , exists = True
+                              , subTrees = []
+                              }
+                          ]
+                      }
+                  ]
+              }
+          , Tree
+              { fullPath = ["Z"]
+              , exists = True
+              , subTrees = []
+              }
+          ]
       }

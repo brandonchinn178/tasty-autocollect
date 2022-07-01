@@ -27,9 +27,9 @@ import Control.Monad ((<=<))
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text as Text
-import GHC.IORef (IORef)
 import GHC.Driver.Main (newHscEnv)
 import GHC.Hs
+import GHC.IORef (IORef)
 import GHC.Parser.Annotation (AnnotationComment (..))
 import GHC.Plugins
 import GHC.SysTools (initSysTools)
@@ -56,7 +56,7 @@ genFuncSig funcName funcType =
     $ funcType
 
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
-genFuncDecl :: Located RdrName ->  [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
+genFuncDecl :: Located RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
   ValD NoExtField . mkFunBind Generated funcName $
     [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
@@ -106,13 +106,13 @@ thNameToGhcNameIO cache name = do
 
   fmap fst
     . runCoreM
-        hscEnv{hsc_NC = cache}
-        (unused "cr_rule_base")
-        (strict '.')
-        (unused "cr_module")
-        (strict mempty)
-        (unused "cr_print_unqual")
-        (unused "cr_loc")
+      hscEnv{hsc_NC = cache}
+      (unused "cr_rule_base")
+      (strict '.')
+      (unused "cr_module")
+      (strict mempty)
+      (unused "cr_print_unqual")
+      (unused "cr_loc")
     $ thNameToGhcName name
   where
     unused msg = error $ "unexpectedly used: " ++ msg

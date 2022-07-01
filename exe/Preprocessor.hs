@@ -11,7 +11,7 @@ plugins run per module).
 But GHC's plugin interface is much nicer for rewriting test files, so
 what we'll do here is:
 
-1. Always register the plugin by adding `{-# OPTIONS_GHC -fplugin=... #-}` to
+1. Always register the plugin by adding `{\-# OPTIONS_GHC -fplugin=... #-\}` to
    the top of the file. The plugin will then inspect the file to see if it's
    a test file, and if so, convert the test module.
 
@@ -24,7 +24,8 @@ import System.Environment (getArgs)
 import Test.Tasty.AutoCollect (processFile)
 
 main :: IO ()
-main = getArgs >>= \case
-  -- https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#options-affecting-a-haskell-pre-processor
-  [fp, input, output] -> Text.readFile input >>= processFile fp >>= Text.writeFile output
-  _ -> error "The tasty-autocollect preprocessor does not accept any additional arguments."
+main =
+  getArgs >>= \case
+    -- https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#options-affecting-a-haskell-pre-processor
+    [fp, input, output] -> Text.readFile input >>= processFile fp >>= Text.writeFile output
+    _ -> error "The tasty-autocollect preprocessor does not accept any additional arguments."

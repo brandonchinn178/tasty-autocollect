@@ -13,10 +13,10 @@ import Data.List (intercalate, stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import GHC.Hs
-import GHC.Plugins
 import GHC.Parser.Annotation (
   getAnnotationComments,
  )
+import GHC.Plugins
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
@@ -27,10 +27,10 @@ import Test.Tasty.AutoCollect.GHC
 Transforms a test module of the form
 
 @
-{- AUTOCOLLECT.TEST -}
+{\- AUTOCOLLECT.TEST -\}
 module MyTest (
   foo,
-  {- AUTOCOLLECT.TEST.export -}
+  {\- AUTOCOLLECT.TEST.export -\}
   bar,
 ) where
 
@@ -83,10 +83,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     mkTestsList :: [Located RdrName] -> [LHsDecl GhcPs]
     mkTestsList testNames =
       let testList = ExplicitList NoExtField Nothing $ map (genLoc . HsVar NoExtField) testNames
-       in
-        [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField $ getTestTreeType names
-        , genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
-        ]
+       in [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField $ getTestTreeType names
+          , genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
+          ]
 
 {- |
 If the given declaration is a test, return the converted test, or otherwise
@@ -111,9 +110,10 @@ convertTest names loc =
     -- =>   test1 = testCase "test name" (<body> :: Assertion)
     ValD _ (FunBind _ funcName funcMatchGroup _)
       | Just tester <- getTester funcName -> do
-          (testName, funcBodyType) <- getLastSeenSig >>= \case
-            Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-            Just SigInfo{..} -> pure (testName, testType)
+          (testName, funcBodyType) <-
+            getLastSeenSig >>= \case
+              Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
+              Just SigInfo{..} -> pure (testName, testType)
 
           let MG{mg_alts = L _ funcMatches} = funcMatchGroup
           funcMatch <-

@@ -1,5 +1,4 @@
 {- AUTOCOLLECT.TEST -}
-
 {-# LANGUAGE OverloadedStrings #-}
 
 module Examples (
