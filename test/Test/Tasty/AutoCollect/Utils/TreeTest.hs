@@ -10,33 +10,33 @@ import Test.Tasty.AutoCollect.Utils.Tree (Tree (..), toTree)
 
 test_testCase :: Assertion
 test_testCase "builds the correct tree" =
-  toTree [["A", "B", "C"], ["A", "B"], ["A", "C", "D"], ["Z"]]
+  toTree (zip [["A", "B", "C"], ["A", "B"], ["A", "C", "D"], ["Z"]] [1 :: Int ..])
     @?= Tree
       { fullPath = []
-      , exists = False
+      , value = Nothing
       , subTrees =
           [ Tree
               { fullPath = ["A"]
-              , exists = False
+              , value = Nothing
               , subTrees =
                   [ Tree
                       { fullPath = ["A", "B"]
-                      , exists = True
+                      , value = Just 2
                       , subTrees =
                           [ Tree
                               { fullPath = ["A", "B", "C"]
-                              , exists = True
+                              , value = Just 1
                               , subTrees = []
                               }
                           ]
                       }
                   , Tree
                       { fullPath = ["A", "C"]
-                      , exists = False
+                      , value = Nothing
                       , subTrees =
                           [ Tree
                               { fullPath = ["A", "C", "D"]
-                              , exists = True
+                              , value = Just 3
                               , subTrees = []
                               }
                           ]
@@ -45,7 +45,7 @@ test_testCase "builds the correct tree" =
               }
           , Tree
               { fullPath = ["Z"]
-              , exists = True
+              , value = Just 4
               , subTrees = []
               }
           ]

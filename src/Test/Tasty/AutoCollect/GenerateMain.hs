@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -5,6 +6,7 @@ module Test.Tasty.AutoCollect.GenerateMain (
   generateMainModule,
 ) where
 
+import Control.Arrow ((&&&))
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -84,19 +86,17 @@ generateTests AutoCollectConfig{..} testModules =
       --         ]
       --     ]
       -- ]
-      testGroupsFromTree $ toTree (map (Text.splitOn ".") testModules)
+      testGroupsFromTree $ toTree (map (Text.splitOn "." &&& id) testModules)
   where
     mkTestsIdentifier testModule = testModule <> "." <> Text.pack testListIdentifier
 
-    testGroupsFromTree Tree{fullPath = testModule, ..} =
+    testGroupsFromTree Tree{value = mTestModule, subTrees} =
       ("concat " <>) . listify $
         [ listify
             [ Text.unwords ["testGroup", quoted $ last $ fullPath tree, "$", testGroupsFromTree tree]
             | tree <- subTrees
             ]
-        , if exists
-            then mkTestsIdentifier $ Text.intercalate "." testModule
-            else "[]"
+        , maybe "[]" mkTestsIdentifier mTestModule
         ]
 
 {----- Helpers -----}

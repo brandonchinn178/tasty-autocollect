@@ -10,14 +10,14 @@ import Data.Maybe (fromMaybe)
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
 
-data Tree a = Tree
-  { fullPath :: [a]
-  , exists :: Bool
-  , subTrees :: [Tree a]
+data Tree k v = Tree
+  { fullPath :: [k]
+  , value :: Maybe v
+  , subTrees :: [Tree k v]
   }
   deriving (Show, Eq)
 
-data TreeMap a = TreeMap Bool (Map a (TreeMap a))
+data TreeMap k v = TreeMap (Maybe v) (Map k (TreeMap k v))
 
 {- |
 Convert the given list of values into a tree.
@@ -30,30 +30,30 @@ would become
 @
 Tree
   { fullPath = []
-  , exists = False
+  , value = Nothing
   , subTrees =
       [ Tree
         { fullPath = [A]
-        , exists = False
+        , value = Nothing
         , subTrees =
             [ Tree
                 { fullPath = [A, B]
-                , exists = True
+                , value = Just ...
                 , subTrees =
                     [ Tree
                         { fullPath = [A, B, C]
-                        , exists = True
+                        , value = Just ...
                         , subTrees = []
                         }
                     ]
                 }
             , Tree
                 { fullPath = [A, C]
-                , exists = False
+                , value = Nothing
                 , subTrees =
                     [ Tree
                         { fullPath = [A, C, D]
-                        , exists = True
+                        , value = Just ...
                         , subTrees = []
                         }
                     ]
@@ -62,26 +62,26 @@ Tree
         }
     , Tree
         { fullPath = [Z]
-        , exists = True
+        , value = Just ...
         , subTrees = []
         }
     ]
   }
 @
 -}
-toTree :: Ord a => [[a]] -> Tree a
+toTree :: Ord k => [([k], v)] -> Tree k v
 toTree = fromTreeMap Seq.empty . foldr insertTreeMap emptyTreeMap
   where
-    emptyTreeMap = TreeMap False Map.empty
+    emptyTreeMap = TreeMap Nothing Map.empty
 
-    insertTreeMap as (TreeMap e children) =
-      case as of
-        [] -> TreeMap True children
-        a : as' -> TreeMap e $ Map.alter (Just . insertTreeMap as' . fromMaybe emptyTreeMap) a children
+    insertTreeMap (ks, v) (TreeMap mVal children) =
+      case ks of
+        [] -> TreeMap (Just v) children
+        k : ks' -> TreeMap mVal $ Map.alter (Just . insertTreeMap (ks', v) . fromMaybe emptyTreeMap) k children
 
-    fromTreeMap path (TreeMap e children) =
+    fromTreeMap path (TreeMap mVal children) =
       Tree
         { fullPath = toList path
-        , exists = e
+        , value = mVal
         , subTrees = Map.elems $ Map.mapWithKey (fromTreeMap . (path |>)) children
         }
