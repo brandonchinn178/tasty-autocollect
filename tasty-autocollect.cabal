@@ -38,6 +38,7 @@ library
       Test.Tasty.AutoCollect.Plugin
       Test.Tasty.AutoCollect.Utils.Text
       Test.Tasty.AutoCollect.Utils.TreeMap
+      Test.Tasty.Ext.Todo
   other-modules:
       Paths_tasty_autocollect
   hs-source-dirs:
