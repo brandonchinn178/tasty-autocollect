@@ -7,6 +7,7 @@ module Test.Tasty.AutoCollect.GenerateMain (
 ) where
 
 import Data.Bifunctor (first)
+import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -16,7 +17,7 @@ import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Utils.Text
-import Test.Tasty.AutoCollect.Utils.Tree
+import qualified Test.Tasty.AutoCollect.Utils.Tree as TreeMap
 
 generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
 generateMainModule cfg@AutoCollectConfig{..} path = do
@@ -85,7 +86,7 @@ generateTests AutoCollectConfig{..} testModules =
       --         ]
       --     ]
       -- ]
-      testGroupsFromTree $ toTree (map (first (Text.splitOn ".")) testModulesInfo)
+      TreeMap.foldTreeMap testGroupFromTree . TreeMap.fromList $ map (first (Text.splitOn ".")) testModulesInfo
   where
     -- List of pairs representing (display name of module, 'tests' identifier)
     testModulesInfo =
@@ -94,14 +95,14 @@ generateTests AutoCollectConfig{..} testModules =
         , testModule <> "." <> Text.pack testListIdentifier
         )
 
-    testGroupsFromTree Tree{value = mTestsIdentifier, subTrees} =
-      ("concat " <>) . listify $
-        [ listify
-            [ Text.unwords ["testGroup", quoted $ last $ fullPath tree, "$", testGroupsFromTree tree]
-            | tree <- subTrees
-            ]
-        , fromMaybe "[]" mTestsIdentifier
-        ]
+    testGroupFromTree mTestsIdentifier subTrees =
+      let subGroups =
+            flip map (Map.toAscList subTrees) $ \(testModuleDisplay, subTests) ->
+              Text.unwords ["testGroup", quoted testModuleDisplay, "$", subTests]
+       in case (subGroups, mTestsIdentifier) of
+            (subGroups', Nothing) -> listify subGroups'
+            ([], Just testsIdentifier) -> testsIdentifier
+            (subGroups', Just testsIdentifier) -> "concat " <> listify [listify subGroups', testsIdentifier]
 
 {----- Helpers -----}
 

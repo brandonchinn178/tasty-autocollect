@@ -1,6 +1,10 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Test.Tasty.AutoCollect.Utils.Tree (
   Tree (..),
   toTree,
+  fromList,
+  foldTreeMap,
 ) where
 
 import Data.Foldable (toList)
@@ -138,3 +142,8 @@ insert originalKeys v = go originalKeys
       case ks of
         [] -> treeMap{value' = Just v}
         k : ks' -> treeMap{children' = Map.alter (Just . go ks' . fromMaybe empty) k (children' treeMap)}
+
+foldTreeMap :: (Maybe v -> Map k r -> r) -> TreeMap k v -> r
+foldTreeMap f = go
+  where
+    go TreeMap{..} = f value' (go <$> children')
