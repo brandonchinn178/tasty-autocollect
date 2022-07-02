@@ -13,6 +13,7 @@ import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.Utils.Text
 import Test.Tasty.AutoCollect.Utils.Tree
 
 generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
@@ -99,13 +100,6 @@ generateTests AutoCollectConfig{..} testModules =
         ]
 
 {----- Helpers -----}
-
--- | Convert a list @["a", "b"]@ to the text @"[\"a\", \"b\"]"@.
-listify :: [Text] -> Text
-listify xs = "[" <> Text.intercalate ", " xs <> "]"
-
-quoted :: Text -> Text
-quoted s = "\"" <> s <> "\""
 
 listDirectoryRecursive :: FilePath -> IO [FilePath]
 listDirectoryRecursive fp = fmap concat . mapM (go . (fp </>)) =<< listDirectory fp
