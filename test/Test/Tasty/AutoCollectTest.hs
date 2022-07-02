@@ -1,7 +1,7 @@
 {- AUTOCOLLECT.TEST -}
 
 module Test.Tasty.AutoCollectTest (
-  {- AUTOCOLLECT.TEST.export -}
+  -- $AUTOCOLLECT.TEST.export$
 ) where
 
 import Test.Tasty.HUnit

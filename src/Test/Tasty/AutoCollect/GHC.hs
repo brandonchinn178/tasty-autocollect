@@ -3,7 +3,7 @@
 
 module Test.Tasty.AutoCollect.GHC (
   -- * Parsers
-  getBlockComment,
+  getCommentContent,
 
   -- * Builders
   genFuncSig,
@@ -23,28 +23,32 @@ module Test.Tasty.AutoCollect.GHC (
   thNameToGhcNameIO,
 ) where
 
-import Control.Monad ((<=<))
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text as Text
-import GHC.IORef (IORef)
-import GHC.Driver.Main (newHscEnv)
 import GHC.Hs
+import GHC.IORef (IORef)
 import GHC.Parser.Annotation (AnnotationComment (..))
 import GHC.Plugins
-import GHC.SysTools (initSysTools)
-import GHC.SysTools.BaseDir (findTopDir)
 import GHC.Types.Name.Cache (NameCache)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
+import Test.Tasty.AutoCollect.Utils.Text
+
 {----- Parsers -----}
 
-getBlockComment :: RealLocated AnnotationComment -> Maybe String
-getBlockComment = \case
-  L _ (AnnBlockComment s) ->
-    fmap (Text.unpack . Text.strip) . Text.stripSuffix "-}" <=< Text.stripPrefix "{-" . Text.pack $ s
-  _ -> Nothing
+getCommentContent :: RealLocated AnnotationComment -> String
+getCommentContent = Text.unpack . Text.strip . unwrapComment . unLoc
+  where
+    unwrapComment = \case
+      AnnDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
+      AnnDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
+      AnnDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
+      AnnDocSection _ s -> Text.pack s
+      AnnDocOptions s -> Text.pack s
+      AnnLineComment s -> withoutPrefix "--" $ Text.pack s
+      AnnBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
 
 {----- Builders -----}
 
@@ -56,7 +60,7 @@ genFuncSig funcName funcType =
     $ funcType
 
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
-genFuncDecl :: Located RdrName ->  [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
+genFuncDecl :: Located RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
   ValD NoExtField . mkFunBind Generated funcName $
     [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
@@ -96,23 +100,17 @@ fromRdrName :: Located RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
 
 -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
-thNameToGhcNameIO :: IORef NameCache -> TH.Name -> IO (Maybe Name)
-thNameToGhcNameIO cache name = do
-  -- https://gitlab.haskell.org/ghc/ghc/-/blob/b5590fff75496356b1817adc9de1f2d361a70dc5/compiler/GHC/Driver/Main.hs#L306-317
-  dir <- findTopDir Nothing
-  sysSettings <- initSysTools dir
-  let dflags = defaultDynFlags sysSettings (unused "DynFlags.llvmConfig")
-  hscEnv <- newHscEnv dflags
-
+thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO hscEnv cache name =
   fmap fst
     . runCoreM
-        hscEnv{hsc_NC = cache}
-        (unused "cr_rule_base")
-        (strict '.')
-        (unused "cr_module")
-        (strict mempty)
-        (unused "cr_print_unqual")
-        (unused "cr_loc")
+      hscEnv{hsc_NC = cache}
+      (unused "cr_rule_base")
+      (strict '.')
+      (unused "cr_module")
+      (strict mempty)
+      (unused "cr_print_unqual")
+      (unused "cr_loc")
     $ thNameToGhcName name
   where
     unused msg = error $ "unexpectedly used: " ++ msg

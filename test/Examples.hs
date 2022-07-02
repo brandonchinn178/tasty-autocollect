@@ -1,9 +1,8 @@
 {- AUTOCOLLECT.TEST -}
-
 {-# LANGUAGE OverloadedStrings #-}
 
 module Examples (
-  {- AUTOCOLLECT.TEST.export -}
+  -- $AUTOCOLLECT.TEST.export$
 ) where
 
 import Data.ByteString.Lazy (ByteString)
