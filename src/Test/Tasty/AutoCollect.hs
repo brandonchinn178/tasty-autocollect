@@ -8,17 +8,28 @@ import Data.Char (isSpace)
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import Test.Tasty.AutoCollect.Config (AutoCollectConfig, parseConfig)
-import Test.Tasty.AutoCollect.Constants (isMainComment, isTestComment)
-import Test.Tasty.AutoCollect.GenerateMain (generateMainModule)
+import Test.Tasty.AutoCollect.Config
+import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.GenerateMain
+import Test.Tasty.AutoCollect.Utils.Text
 
 -- | Preprocess the given Haskell file. See Preprocessor.hs
 processFile :: FilePath -> Text -> IO Text
 processFile path file =
   case parseModuleType file of
     Just (ModuleMain cfg) -> generateMainModule cfg path
-    Just ModuleTest -> pure $ "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.Plugin #-}\n" <> file
-    Nothing -> pure file
+    Just ModuleTest ->
+      pure . Text.unlines $
+        [ "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.Plugin #-}"
+        , file'
+        ]
+    Nothing -> pure file'
+  where
+    file' =
+      Text.unlines
+        [ "{-# LINE 1 " <> quoted (Text.pack path) <> " #-}"
+        , file
+        ]
 
 {----- Parse module type -----}
 

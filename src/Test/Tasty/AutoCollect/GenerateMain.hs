@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -5,6 +6,7 @@ module Test.Tasty.AutoCollect.GenerateMain (
   generateMainModule,
 ) where
 
+import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -13,6 +15,7 @@ import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.Utils.Text
 import Test.Tasty.AutoCollect.Utils.Tree
 
 generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
@@ -60,7 +63,6 @@ findTestModules path = mapMaybe toModule . filter (/= path) <$> listDirectoryRec
 
 generateTests :: AutoCollectConfig -> [Text] -> Text
 generateTests AutoCollectConfig{..} testModules =
-  -- TODO: handle cfgStripSuffix
   case cfgGroupType of
     AutoCollectGroupFlat ->
       -- concat
@@ -68,13 +70,13 @@ generateTests AutoCollectConfig{..} testModules =
       --   , My.Module.Test2.tests
       --   , ...
       --   ]
-      "concat " <> listify (map mkTestsIdentifier testModules)
+      "concat " <> listify (map snd testModulesInfo)
     AutoCollectGroupModules ->
       -- [ testGroup "My.Module.Test1" My.Module.Test1.tests
       -- , testGroup "My.Module.Test2" My.Module.Test2.tests
       -- ]
-      listify . flip map testModules $ \testModule ->
-        Text.unwords ["testGroup", quoted testModule, mkTestsIdentifier testModule]
+      listify . flip map testModulesInfo $ \(testModuleDisplay, testsIdentifier) ->
+        Text.unwords ["testGroup", quoted testModuleDisplay, testsIdentifier]
     AutoCollectGroupTree ->
       -- [ testGroup "My"
       --     [ testGroup "Module"
@@ -83,29 +85,25 @@ generateTests AutoCollectConfig{..} testModules =
       --         ]
       --     ]
       -- ]
-      testGroupsFromTree $ toTree (map (Text.splitOn ".") testModules)
+      testGroupsFromTree $ toTree (map (first (Text.splitOn ".")) testModulesInfo)
   where
-    mkTestsIdentifier testModule = testModule <> "." <> Text.pack testListIdentifier
+    -- List of pairs representing (display name of module, 'tests' identifier)
+    testModulesInfo =
+      flip map testModules $ \testModule ->
+        ( withoutSuffix cfgStripSuffix testModule
+        , testModule <> "." <> Text.pack testListIdentifier
+        )
 
-    testGroupsFromTree Tree{fullPath = testModule, ..} =
+    testGroupsFromTree Tree{value = mTestsIdentifier, subTrees} =
       ("concat " <>) . listify $
         [ listify
             [ Text.unwords ["testGroup", quoted $ last $ fullPath tree, "$", testGroupsFromTree tree]
             | tree <- subTrees
             ]
-        , if exists
-            then mkTestsIdentifier $ Text.intercalate "." testModule
-            else "[]"
+        , fromMaybe "[]" mTestsIdentifier
         ]
 
 {----- Helpers -----}
-
--- | Convert a list @["a", "b"]@ to the text @"[\"a\", \"b\"]"@.
-listify :: [Text] -> Text
-listify xs = "[" <> Text.intercalate ", " xs <> "]"
-
-quoted :: Text -> Text
-quoted s = "\"" <> s <> "\""
 
 listDirectoryRecursive :: FilePath -> IO [FilePath]
 listDirectoryRecursive fp = fmap concat . mapM (go . (fp </>)) =<< listDirectory fp
