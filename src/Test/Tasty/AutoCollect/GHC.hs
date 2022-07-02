@@ -26,13 +26,10 @@ module Test.Tasty.AutoCollect.GHC (
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text as Text
-import GHC.Driver.Main (newHscEnv)
 import GHC.Hs
 import GHC.IORef (IORef)
 import GHC.Parser.Annotation (AnnotationComment (..))
 import GHC.Plugins
-import GHC.SysTools (initSysTools)
-import GHC.SysTools.BaseDir (findTopDir)
 import GHC.Types.Name.Cache (NameCache)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
@@ -103,14 +100,8 @@ fromRdrName :: Located RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
 
 -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
-thNameToGhcNameIO :: IORef NameCache -> TH.Name -> IO (Maybe Name)
-thNameToGhcNameIO cache name = do
-  -- https://gitlab.haskell.org/ghc/ghc/-/blob/b5590fff75496356b1817adc9de1f2d361a70dc5/compiler/GHC/Driver/Main.hs#L306-317
-  dir <- findTopDir Nothing
-  sysSettings <- initSysTools dir
-  let dflags = defaultDynFlags sysSettings (unused "DynFlags.llvmConfig")
-  hscEnv <- newHscEnv dflags
-
+thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO hscEnv cache name =
   fmap fst
     . runCoreM
       hscEnv{hsc_NC = cache}
