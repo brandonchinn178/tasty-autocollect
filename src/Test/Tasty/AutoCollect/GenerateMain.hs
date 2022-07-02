@@ -17,7 +17,7 @@ import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Utils.Text
-import qualified Test.Tasty.AutoCollect.Utils.Tree as TreeMap
+import qualified Test.Tasty.AutoCollect.Utils.TreeMap as TreeMap
 
 generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
 generateMainModule cfg@AutoCollectConfig{..} path = do

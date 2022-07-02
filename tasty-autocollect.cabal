@@ -36,7 +36,7 @@ library
       Test.Tasty.AutoCollect.GHC
       Test.Tasty.AutoCollect.Plugin
       Test.Tasty.AutoCollect.Utils.Text
-      Test.Tasty.AutoCollect.Utils.Tree
+      Test.Tasty.AutoCollect.Utils.TreeMap
   other-modules:
       Paths_tasty_autocollect
   hs-source-dirs:
@@ -80,7 +80,7 @@ test-suite tasty-autocollect-tests
   main-is: Main.hs
   other-modules:
       Examples
-      Test.Tasty.AutoCollect.Utils.TreeTest
+      Test.Tasty.AutoCollect.Utils.TreeMapTest
       Test.Tasty.AutoCollectTest
       Paths_tasty_autocollect
   hs-source-dirs:
@@ -91,6 +91,7 @@ test-suite tasty-autocollect-tests
   build-depends:
       base
     , bytestring
+    , containers
     , tasty
     , tasty-autocollect
     , tasty-golden

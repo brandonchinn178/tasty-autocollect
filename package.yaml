@@ -57,6 +57,7 @@ tests:
     dependencies:
       - base
       - bytestring
+      - containers
       - tasty
       - tasty-autocollect
       - tasty-golden
