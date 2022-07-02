@@ -1,7 +1,7 @@
 {- AUTOCOLLECT.TEST -}
 
 module Test.Tasty.AutoCollect.Utils.TreeTest (
-  {- AUTOCOLLECT.TEST.export -}
+  -- $AUTOCOLLECT.TEST.export$
 ) where
 
 import Test.Tasty.HUnit

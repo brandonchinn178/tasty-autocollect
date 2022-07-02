@@ -35,6 +35,7 @@ library
       Test.Tasty.AutoCollect.GenerateMain
       Test.Tasty.AutoCollect.GHC
       Test.Tasty.AutoCollect.Plugin
+      Test.Tasty.AutoCollect.Utils.Text
       Test.Tasty.AutoCollect.Utils.Tree
   other-modules:
       Paths_tasty_autocollect

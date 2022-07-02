@@ -3,7 +3,7 @@
 
 module Test.Tasty.AutoCollect.GHC (
   -- * Parsers
-  getBlockComment,
+  getCommentContent,
 
   -- * Builders
   genFuncSig,
@@ -23,7 +23,6 @@ module Test.Tasty.AutoCollect.GHC (
   thNameToGhcNameIO,
 ) where
 
-import Control.Monad ((<=<))
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text as Text
@@ -38,13 +37,21 @@ import GHC.Types.Name.Cache (NameCache)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
+import Test.Tasty.AutoCollect.Utils.Text
+
 {----- Parsers -----}
 
-getBlockComment :: RealLocated AnnotationComment -> Maybe String
-getBlockComment = \case
-  L _ (AnnBlockComment s) ->
-    fmap (Text.unpack . Text.strip) . Text.stripSuffix "-}" <=< Text.stripPrefix "{-" . Text.pack $ s
-  _ -> Nothing
+getCommentContent :: RealLocated AnnotationComment -> String
+getCommentContent = Text.unpack . Text.strip . unwrapComment . unLoc
+  where
+    unwrapComment = \case
+      AnnDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
+      AnnDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
+      AnnDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
+      AnnDocSection _ s -> Text.pack s
+      AnnDocOptions s -> Text.pack s
+      AnnLineComment s -> withoutPrefix "--" $ Text.pack s
+      AnnBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
 
 {----- Builders -----}
 

@@ -74,7 +74,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
       | otherwise =
           loc
     getTestExportAnnSrcSpan loc =
-      if maybe False isTestExportComment (getBlockComment loc)
+      if isTestExportComment (getCommentContent loc)
         then Just (getLoc loc)
         else Nothing
     exportIE = IEVar NoExtField $ genLoc $ IEName testListName
