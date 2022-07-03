@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Test.Tasty.AutoCollect.ConvertTest (
-  transformTestModule,
+  plugin,
 ) where
 
 import Control.Monad.Trans.State.Strict (State)
@@ -12,16 +12,30 @@ import Data.Foldable (toList)
 import Data.List (intercalate, stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import GHC.Driver.Main (getHscEnv)
 import GHC.Hs
-import GHC.Parser.Annotation (
-  getAnnotationComments,
- )
-import GHC.Plugins
+import GHC.Parser.Annotation (getAnnotationComments)
+import GHC.Plugins hiding (getHscEnv)
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.ExternalNames
 import Test.Tasty.AutoCollect.GHC
+
+-- | The plugin to convert a test file. Injected by the preprocessor.
+plugin :: Plugin
+plugin =
+  defaultPlugin
+    { dynflagsPlugin = \_ df ->
+        -- TODO: for some reason, without Opt_KeepRawTokenStream, we get
+        -- unused-top-binds errors for generated exports. Ticket?
+        pure $ df `gopt_set` Opt_KeepRawTokenStream
+    , pluginRecompile = purePlugin
+    , parsedResultAction = \_ _ modl -> do
+        env <- getHscEnv
+        names <- liftIO $ loadExternalNames env
+        pure $ transformTestModule names modl
+    }
 
 {- |
 Transforms a test module of the form
