@@ -86,8 +86,8 @@ test-suite tasty-autocollect-tests
       Test.Tasty.AutoCollect.Utils.TreeMapTest
       Test.Tasty.AutoCollectTest
       Test.Tasty.Ext.TodoTest
-      TestUtils.Assertion
       TestUtils.Integration
+      TestUtils.Predicates
       Paths_tasty_autocollect
   hs-source-dirs:
       test
@@ -98,6 +98,7 @@ test-suite tasty-autocollect-tests
       base
     , bytestring
     , containers
+    , explainable-predicates
     , filepath
     , tasty
     , tasty-autocollect
