@@ -90,6 +90,7 @@ test-suite tasty-autocollect-tests
       Test.Tasty.Ext.TodoTest
       TestUtils.Integration
       TestUtils.Predicates
+      TestUtils.QuickCheck
       Paths_tasty_autocollect
   hs-source-dirs:
       test

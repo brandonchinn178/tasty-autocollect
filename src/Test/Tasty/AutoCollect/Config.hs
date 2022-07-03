@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.Config (
   AutoCollectConfig (..),
@@ -28,7 +29,7 @@ data AutoCollectConfig = AutoCollectConfig
   -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
   -- a module @Foo.BarTest@ to @Foo.Bar@.
   }
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data AutoCollectGroupType
   = -- | All tests will be flattened like
@@ -60,7 +61,7 @@ data AutoCollectGroupType
     --     test3
     -- @
     AutoCollectGroupTree
-  deriving (Eq)
+  deriving (Show, Eq)
 
 defaultConfig :: AutoCollectConfig
 defaultConfig =
@@ -81,7 +82,10 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
     parseLine s = do
       (k, v) <-
         case Text.splitOn "=" s of
-          [k, v] -> pure (Text.strip k, Text.strip v)
+          [Text.strip -> k, Text.strip -> v]
+            | not (Text.null k)
+            , not (Text.null v) ->
+                pure (k, v)
           _ -> Left $ "Invalid configuration line: " <> Text.pack (show s)
 
       case k of
