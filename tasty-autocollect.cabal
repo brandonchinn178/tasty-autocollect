@@ -83,8 +83,11 @@ test-suite tasty-autocollect-tests
   main-is: Main.hs
   other-modules:
       Examples
+      Test.Tasty.AutoCollect.ConfigTest
+      Test.Tasty.AutoCollect.ConvertTestTest
+      Test.Tasty.AutoCollect.GenerateMainTest
+      Test.Tasty.AutoCollect.ModuleTypeTest
       Test.Tasty.AutoCollect.Utils.TreeMapTest
-      Test.Tasty.AutoCollectTest
       Test.Tasty.Ext.TodoTest
       TestUtils.Integration
       TestUtils.Predicates
