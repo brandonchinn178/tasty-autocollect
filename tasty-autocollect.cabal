@@ -34,6 +34,7 @@ library
       Test.Tasty.AutoCollect.ExternalNames
       Test.Tasty.AutoCollect.GenerateMain
       Test.Tasty.AutoCollect.GHC
+      Test.Tasty.AutoCollect.ModuleType
       Test.Tasty.AutoCollect.Plugin
       Test.Tasty.AutoCollect.Utils.Text
       Test.Tasty.AutoCollect.Utils.TreeMap
