@@ -183,17 +183,20 @@ testListName = mkLRdrName testListIdentifier
 
 data Tester
   = Tester String
+  | TesterTodo
   deriving (Show, Eq)
 
 parseTester :: Located RdrName -> Maybe Tester
 parseTester = fmap toIdentifier . stripPrefix "test_" . fromRdrName
   where
     toIdentifier = \case
+      "todo" -> TesterTodo
       s -> Tester s
 
 fromTester :: ExternalNames -> Tester -> RdrName
-fromTester _ = \case
+fromTester names = \case
   Tester name -> mkRdrName name
+  TesterTodo -> getRdrName $ name_testTreeTodo names
 
 getTestTreeType :: ExternalNames -> LHsType GhcPs
 getTestTreeType = genLoc . HsTyVar NoExtField NotPromoted . genLoc . getRdrName . name_TestTree
