@@ -113,7 +113,9 @@ convertTest names loc =
           (testName, funcBodyType) <-
             getLastSeenSig >>= \case
               Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{tester = _, ..} -> pure (testName, testType)
+              Just SigInfo{tester = testerFromSig, ..}
+                | tester == testerFromSig -> pure (testName, testType)
+                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (tester, testerFromSig)
 
           let MG{mg_alts = L _ funcMatches} = funcMatchGroup
           funcMatch <-
@@ -181,6 +183,7 @@ testListName = mkLRdrName testListIdentifier
 
 data Tester
   = Tester String
+  deriving (Show, Eq)
 
 parseTester :: Located RdrName -> Maybe Tester
 parseTester = fmap toIdentifier . stripPrefix "test_" . fromRdrName
