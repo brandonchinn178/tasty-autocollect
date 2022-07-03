@@ -58,8 +58,12 @@ tests:
       - base
       - bytestring
       - containers
+      - filepath
       - tasty
       - tasty-autocollect
       - tasty-golden
       - tasty-hunit
       - tasty-quickcheck
+      - temporary
+      - text
+      - typed-process

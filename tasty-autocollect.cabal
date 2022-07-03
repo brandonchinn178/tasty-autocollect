@@ -34,9 +34,11 @@ library
       Test.Tasty.AutoCollect.ExternalNames
       Test.Tasty.AutoCollect.GenerateMain
       Test.Tasty.AutoCollect.GHC
+      Test.Tasty.AutoCollect.ModuleType
       Test.Tasty.AutoCollect.Plugin
       Test.Tasty.AutoCollect.Utils.Text
       Test.Tasty.AutoCollect.Utils.TreeMap
+      Test.Tasty.Ext.Todo
   other-modules:
       Paths_tasty_autocollect
   hs-source-dirs:
@@ -82,6 +84,9 @@ test-suite tasty-autocollect-tests
       Examples
       Test.Tasty.AutoCollect.Utils.TreeMapTest
       Test.Tasty.AutoCollectTest
+      Test.Tasty.Ext.TodoTest
+      TestUtils.Assertion
+      TestUtils.Integration
       Paths_tasty_autocollect
   hs-source-dirs:
       test
@@ -92,11 +97,15 @@ test-suite tasty-autocollect-tests
       base
     , bytestring
     , containers
+    , filepath
     , tasty
     , tasty-autocollect
     , tasty-golden
     , tasty-hunit
     , tasty-quickcheck
+    , temporary
+    , text
+    , typed-process
   if impl(ghc >= 8.0)
     ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   if impl(ghc < 8.8)

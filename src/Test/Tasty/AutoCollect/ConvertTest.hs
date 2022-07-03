@@ -97,11 +97,11 @@ convertTest names loc =
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: TestTree
     SigD _ (TypeSig _ [funcName] ty)
-      | Just tester <- getTester funcName -> do
+      | Just tester <- parseTester funcName -> do
           testName <- getNextTestName
           setLastSeenSig
             SigInfo
-              { testerName = tester
+              { tester
               , testName
               , testType = ty
               }
@@ -109,11 +109,13 @@ convertTest names loc =
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = testCase "test name" (<body> :: Assertion)
     ValD _ (FunBind _ funcName funcMatchGroup _)
-      | Just tester <- getTester funcName -> do
+      | Just tester <- parseTester funcName -> do
           (testName, funcBodyType) <-
             getLastSeenSig >>= \case
               Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{..} -> pure (testName, testType)
+              Just SigInfo{tester = testerFromSig, ..}
+                | tester == testerFromSig -> pure (testName, testType)
+                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (tester, testerFromSig)
 
           let MG{mg_alts = L _ funcMatches} = funcMatchGroup
           funcMatch <-
@@ -138,7 +140,7 @@ convertTest names loc =
 
           -- tester (...funcArgs) (funcBody :: mType)
           let testBody =
-                mkHsApps (genLoc $ HsVar NoExtField $ mkLRdrName tester) $
+                mkHsApps (genLoc $ HsVar NoExtField $ genLoc $ fromTester names tester) $
                   map patternToExpr funcArgs ++ [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
 
           pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
@@ -179,8 +181,22 @@ patternToExpr lpat =
 testListName :: Located RdrName
 testListName = mkLRdrName testListIdentifier
 
-getTester :: Located RdrName -> Maybe String
-getTester = stripPrefix "test_" . fromRdrName
+data Tester
+  = Tester String
+  | TesterTodo
+  deriving (Show, Eq)
+
+parseTester :: Located RdrName -> Maybe Tester
+parseTester = fmap toIdentifier . stripPrefix "test_" . fromRdrName
+  where
+    toIdentifier = \case
+      "todo" -> TesterTodo
+      s -> Tester s
+
+fromTester :: ExternalNames -> Tester -> RdrName
+fromTester names = \case
+  Tester name -> mkRdrName name
+  TesterTodo -> getRdrName $ name_testTreeTodo names
 
 getTestTreeType :: ExternalNames -> LHsType GhcPs
 getTestTreeType = genLoc . HsTyVar NoExtField NotPromoted . genLoc . getRdrName . name_TestTree
@@ -195,8 +211,8 @@ data ConvertTestState = ConvertTestState
   }
 
 data SigInfo = SigInfo
-  { testerName :: String
-  -- ^ The name of the tester (e.g. "testCase")
+  { tester :: Tester
+  -- ^ The parsed tester
   , testName :: Located RdrName
   -- ^ The generated name for the test
   , testType :: LHsSigWcType GhcPs

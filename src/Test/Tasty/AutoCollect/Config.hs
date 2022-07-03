@@ -28,6 +28,7 @@ data AutoCollectConfig = AutoCollectConfig
   -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
   -- a module @Foo.BarTest@ to @Foo.Bar@.
   }
+  deriving (Eq)
 
 data AutoCollectGroupType
   = -- | All tests will be flattened like
@@ -59,6 +60,7 @@ data AutoCollectGroupType
     --     test3
     -- @
     AutoCollectGroupTree
+  deriving (Eq)
 
 defaultConfig :: AutoCollectConfig
 defaultConfig =
