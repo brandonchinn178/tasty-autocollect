@@ -21,3 +21,6 @@ test_todo "Integration: different arities" = ()
 
 test_todo :: ()
 test_todo "Integration: works when exporting everything" = ()
+
+test_todo :: ()
+test_todo "Integration: works when file contains multi-function signature" = ()

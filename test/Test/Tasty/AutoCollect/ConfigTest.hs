@@ -10,7 +10,7 @@ module Test.Tasty.AutoCollect.ConfigTest (
 ) where
 
 import Data.Bifunctor (first)
-import Data.Char (isSpace, toLower, toUpper)
+import Data.Char (isSpace)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
@@ -207,10 +207,6 @@ data BoolOption = BoolOption {getBool :: Bool, getText :: Text}
 
 instance Arbitrary BoolOption where
   arbitrary = do
-    cases <- infiniteList
     b <- arbitrary
-    let s = zipWith setCase cases (show b)
-    pure $ BoolOption b (Text.pack s)
-    where
-      setCase False = toLower
-      setCase True = toUpper
+    s <- genMixedCase (Text.pack $ show b)
+    pure $ BoolOption b s

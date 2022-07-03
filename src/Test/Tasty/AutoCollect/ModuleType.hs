@@ -15,7 +15,7 @@ import Test.Tasty.AutoCollect.Constants
 data ModuleType
   = ModuleMain AutoCollectConfig
   | ModuleTest
-  deriving (Eq)
+  deriving (Show, Eq)
 
 parseModuleType :: Text -> Maybe ModuleType
 parseModuleType = go . groupWhitespace
