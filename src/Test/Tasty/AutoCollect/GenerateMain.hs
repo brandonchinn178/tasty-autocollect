@@ -11,11 +11,13 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.ModuleType
 import Test.Tasty.AutoCollect.Utils.Text
 import qualified Test.Tasty.AutoCollect.Utils.TreeMap as TreeMap
 
@@ -54,13 +56,21 @@ Find all test modules using the given path to the Main module.
 ["My.Module.Test1", "My.Module.Test2", ...]
 -}
 findTestModules :: FilePath -> IO [Text]
-findTestModules path = mapMaybe toModule . filter (/= path) <$> listDirectoryRecursive testDir
+findTestModules path = mapMaybe toModule <$> (filterM isTestModule =<< listDirectoryRecursive testDir)
   where
     testDir = takeDirectory path
+    isTestModule = fmap ((== Just ModuleTest) . parseModuleType) . Text.readFile
     toModule fp =
       case splitExtensions (makeRelative testDir fp) of
         (name, ".hs") -> Just (Text.replace "/" "." . Text.pack $ name)
         _ -> Nothing
+
+    filterM :: Monad m => (a -> m Bool) -> [a] -> m [a]
+    filterM _ [] = pure []
+    filterM f (x : xs) = do
+      b <- f x
+      let update = if b then (x :) else id
+      update <$> filterM f xs
 
 generateTests :: AutoCollectConfig -> [Text] -> Text
 generateTests AutoCollectConfig{..} testModules =
