@@ -96,10 +96,16 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     -- Generate the `tests` list
     mkTestsList :: [Located RdrName] -> [LHsDecl GhcPs]
     mkTestsList testNames =
-      let testList = genList $ map lhsvar testNames
+      let testsList = genList $ map lhsvar testNames
        in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
-          , genLoc $ genFuncDecl testListName [] (mkHsApp (lhsvar $ mkLRdrName "concat") testList) Nothing
+          , genLoc $ genFuncDecl testListName [] (flattenTestList testsList) Nothing
           ]
+
+    flattenTestList testsList =
+      mkHsApp (lhsvar $ mkLRdrName "concat") $
+        genLoc . ExprWithTySig NoExtField testsList $
+          HsWC NoExtField . HsIB NoExtField . genLoc $
+            HsListTy NoExtField (getListOfTestTreeType names)
 
 {- |
 If the given declaration is a test, return the converted test, or otherwise
