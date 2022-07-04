@@ -1,17 +1,20 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module TestUtils.Integration (
   runTest,
   runTestWith,
-  runTest_,
-  runTestWith_,
+  assertSuccess,
+  assertSuccess_,
+  assertAnyFailure,
+  assertAnyFailure_,
   GHCProject (..),
   runghc,
   ExitCode (..),
 ) where
 
-import Control.Monad (forM_)
+import Control.Monad (forM_, void)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -38,11 +41,11 @@ Run a test file with tasty-autocollect.
 Automatically imports Test.Tasty and Test.Tasty.HUnit.
 -}
 runTest :: FileContents -> IO (ExitCode, Text, Text)
-runTest contents = runTestWith contents id
+runTest = runTestWith id
 
 -- | Same as 'runTest', except allows modifying the project before running.
-runTestWith :: FileContents -> (GHCProject -> GHCProject) -> IO (ExitCode, Text, Text)
-runTestWith contents f =
+runTestWith :: (GHCProject -> GHCProject) -> FileContents -> IO (ExitCode, Text, Text)
+runTestWith f contents =
   runghc . f $
     GHCProject
       { dependencies = ["tasty", "tasty-hunit"]
@@ -62,22 +65,33 @@ runTestWith contents f =
       , "import Test.Tasty.HUnit"
       ]
 
--- | Same as 'runTest', except throws an error if the run fails.
-runTest_ :: FileContents -> IO (Text, Text)
-runTest_ contents = runTestWith_ contents id
-
--- | Same as 'runTestWith', except throws an error if the run fails.
-runTestWith_ :: FileContents -> (GHCProject -> GHCProject) -> IO (Text, Text)
-runTestWith_ contents f = do
-  (code, stdout, stderr) <- runTestWith contents f
-  case code of
-    ExitSuccess -> return (stdout, stderr)
-    ExitFailure _ ->
+assertStatus :: (ExitCode -> Bool) -> IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertStatus isExpected testResult = do
+  (code, stdout, stderr) <- testResult
+  if isExpected code
+    then return (stdout, stderr)
+    else
       errorWithoutStackTrace . unlines $
         [ "Got: " ++ show code
         , "Stdout: " ++ Text.unpack stdout
         , "Stderr: " ++ Text.unpack stderr
         ]
+
+assertSuccess :: IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertSuccess = assertStatus $ \case
+  ExitSuccess -> True
+  ExitFailure _ -> False
+
+assertSuccess_ :: IO (ExitCode, Text, Text) -> IO ()
+assertSuccess_ = void . assertSuccess
+
+assertAnyFailure :: IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertAnyFailure = assertStatus $ \case
+  ExitSuccess -> False
+  ExitFailure _ -> True
+
+assertAnyFailure_ :: IO (ExitCode, Text, Text) -> IO ()
+assertAnyFailure_ = void . assertAnyFailure
 
 -- | Compile and run the given project.
 runghc :: GHCProject -> IO (ExitCode, Text, Text)
