@@ -3,14 +3,20 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module TestUtils.Integration (
+  -- * Runners
   runTest,
   runTestWith,
   assertSuccess,
   assertSuccess_,
   assertAnyFailure,
   assertAnyFailure_,
+
+  -- * Low-level
   GHCProject (..),
+  modifyFile,
   runghc,
+
+  -- * Re-exports
   ExitCode (..),
 ) where
 
@@ -92,6 +98,13 @@ assertAnyFailure = assertStatus $ \case
 
 assertAnyFailure_ :: IO (ExitCode, Text, Text) -> IO ()
 assertAnyFailure_ = void . assertAnyFailure
+
+{----- GHCProject operations -----}
+
+modifyFile :: FilePath -> (FileContents -> FileContents) -> GHCProject -> GHCProject
+modifyFile path f proj = proj{files = map modify (files proj)}
+  where
+    modify (fp, contents) = (fp, (if fp == path then f else id) contents)
 
 -- | Compile and run the given project.
 runghc :: GHCProject -> IO (ExitCode, Text, Text)

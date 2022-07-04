@@ -20,6 +20,8 @@ extra-source-files:
     README.md
     CHANGELOG.md
     test/golden/example.golden
+    test/golden/test_batch_args.golden
+    test/golden/test_batch_type.golden
 
 source-repository head
   type: git
@@ -88,6 +90,7 @@ test-suite tasty-autocollect-tests
       Test.Tasty.AutoCollect.ModuleTypeTest
       Test.Tasty.AutoCollect.Utils.TreeMapTest
       Test.Tasty.Ext.TodoTest
+      TestUtils.Golden
       TestUtils.Integration
       TestUtils.Predicates
       TestUtils.QuickCheck

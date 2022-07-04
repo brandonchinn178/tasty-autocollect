@@ -184,7 +184,7 @@ patternToExpr :: LPat GhcPs -> LHsExpr GhcPs
 patternToExpr lpat =
   case unLoc lpat of
     WildPat{} -> unsupported "wildcard patterns"
-    VarPat _ name -> error "VarPat" name
+    VarPat _ name -> genLoc $ HsVar NoExtField name
     LazyPat{} -> unsupported "lazy patterns"
     AsPat{} -> unsupported "as patterns"
     ParPat _ p -> genLoc $ HsPar NoExtField $ patternToExpr p
