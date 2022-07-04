@@ -24,3 +24,12 @@ test_todo "Integration: works when exporting everything" = ()
 
 test_todo :: ()
 test_todo "Integration: works when file contains multi-function signature" = ()
+
+test_todo :: ()
+test_todo "Integration: test_batch works" = ()
+
+test_todo :: ()
+test_todo "Integration: test_batch fails with args" = ()
+
+test_todo :: ()
+test_todo "Integration: test_batch fails with different type" = ()

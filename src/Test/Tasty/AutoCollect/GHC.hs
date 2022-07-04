@@ -8,6 +8,8 @@ module Test.Tasty.AutoCollect.GHC (
   -- * Builders
   genFuncSig,
   genFuncDecl,
+  genList,
+  lhsvar,
 
   -- * Located utilities
   genLoc,
@@ -67,6 +69,12 @@ genFuncDecl funcName funcArgs funcBody mFuncWhere =
     ]
   where
     funcWhere = fromMaybe (genLoc emptyLocalBinds) mFuncWhere
+
+genList :: [LHsExpr GhcPs] -> LHsExpr GhcPs
+genList = genLoc . ExplicitList NoExtField Nothing
+
+lhsvar :: Located RdrName -> LHsExpr GhcPs
+lhsvar = genLoc . HsVar NoExtField
 
 {----- Located utilities -----}
 

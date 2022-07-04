@@ -96,9 +96,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     -- Generate the `tests` list
     mkTestsList :: [Located RdrName] -> [LHsDecl GhcPs]
     mkTestsList testNames =
-      let testList = ExplicitList NoExtField Nothing $ map (genLoc . HsVar NoExtField) testNames
-       in [ genLoc $ genFuncSig testListName $ genLoc $ HsListTy NoExtField $ getTestTreeType names
-          , genLoc $ genFuncDecl testListName [] (genLoc testList) Nothing
+      let testList = genList $ map lhsvar testNames
+       in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
+          , genLoc $ genFuncDecl testListName [] (mkHsApp (lhsvar $ mkLRdrName "concat") testList) Nothing
           ]
 
 {- |
@@ -109,27 +109,27 @@ convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
 convertTest names loc =
   case unLoc loc of
     -- e.g. test_testCase :: Assertion
-    -- =>   test1 :: TestTree
+    -- =>   test1 :: [TestTree]
     SigD _ (TypeSig _ [funcName] ty)
-      | Just tester <- parseTester funcName -> do
+      | Just testType <- parseTestType funcName -> do
           testName <- getNextTestName
           setLastSeenSig
             SigInfo
-              { tester
+              { testType
               , testName
-              , testType = ty
+              , testHsType = ty
               }
-          pure (genFuncSig testName (getTestTreeType names) <$ loc)
+          pure (genFuncSig testName (getListOfTestTreeType names) <$ loc)
     -- e.g. test_testCase "test name" = <body>
-    -- =>   test1 = testCase "test name" (<body> :: Assertion)
+    -- =>   test1 = [testCase "test name" (<body> :: Assertion)]
     ValD _ (FunBind _ funcName funcMatchGroup _)
-      | Just tester <- parseTester funcName -> do
+      | Just testType <- parseTestType funcName -> do
           (testName, funcBodyType) <-
             getLastSeenSig >>= \case
               Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{tester = testerFromSig, ..}
-                | tester == testerFromSig -> pure (testName, testType)
-                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (tester, testerFromSig)
+              Just SigInfo{testType = testTypeFromSig, ..}
+                | testType == testTypeFromSig -> pure (testName, testHsType)
+                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
           let MG{mg_alts = L _ funcMatches} = funcMatchGroup
           funcMatch <-
@@ -152,10 +152,19 @@ convertTest names loc =
                   , "Found guards at " ++ getSpanLine funcName
                   ]
 
-          -- tester (...funcArgs) (funcBody :: mType)
-          let testBody =
-                mkHsApps (genLoc $ HsVar NoExtField $ genLoc $ fromTester names tester) $
-                  map patternToExpr funcArgs ++ [genLoc $ ExprWithTySig NoExtField funcBody funcBodyType]
+          -- tester (...funcArgs) (funcBody :: funcBodyType)
+          let funcBodyWithType = genLoc $ ExprWithTySig NoExtField funcBody funcBodyType
+              testBody =
+                case testType of
+                  TestSingle tester ->
+                    genList
+                      [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
+                          map patternToExpr funcArgs ++ [funcBodyWithType]
+                      ]
+                  TestBatch
+                    | not (null funcArgs) -> autocollectError "test_batch should not be used with arguments"
+                    | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
+                    | otherwise -> funcBodyWithType
 
           pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
     -- anything else leave unmodified
@@ -174,14 +183,14 @@ patternToExpr lpat =
     AsPat{} -> unsupported "as patterns"
     ParPat _ p -> genLoc $ HsPar NoExtField $ patternToExpr p
     BangPat{} -> unsupported "bang patterns"
-    ListPat _ ps -> genLoc $ ExplicitList NoExtField Nothing $ map patternToExpr ps
+    ListPat _ ps -> genList $ map patternToExpr ps
     TuplePat _ ps boxity -> genLoc $ ExplicitTuple NoExtField (map (genLoc . Present NoExtField . patternToExpr) ps) boxity
     SumPat{} -> unsupported "anonymous sum patterns"
     ConPat _ conName conDetails ->
       case conDetails of
-        PrefixCon args -> mkHsApps (genLoc (HsVar NoExtField conName)) $ map patternToExpr args
+        PrefixCon args -> mkHsApps (lhsvar conName) $ map patternToExpr args
         RecCon fields -> genLoc $ RecordCon NoExtField conName $ patternToExpr <$> fields
-        InfixCon l r -> mkHsApps (genLoc (HsVar NoExtField conName)) $ map patternToExpr [l, r]
+        InfixCon l r -> mkHsApps (lhsvar conName) $ map patternToExpr [l, r]
     ViewPat{} -> unsupported "view patterns"
     SplicePat _ splice -> genLoc $ HsSpliceE NoExtField splice
     LitPat _ lit -> genLoc $ HsLit NoExtField lit
@@ -195,25 +204,46 @@ patternToExpr lpat =
 testListName :: Located RdrName
 testListName = mkLRdrName testListIdentifier
 
+data TestType
+  = TestSingle Tester
+  | TestBatch
+  deriving (Show, Eq)
+
 data Tester
   = Tester String
   | TesterTodo
   deriving (Show, Eq)
 
-parseTester :: Located RdrName -> Maybe Tester
-parseTester = fmap toIdentifier . stripPrefix "test_" . fromRdrName
+parseTestType :: Located RdrName -> Maybe TestType
+parseTestType = fmap toTestType . stripPrefix "test_" . fromRdrName
   where
-    toIdentifier = \case
-      "todo" -> TesterTodo
-      s -> Tester s
+    toTestType = \case
+      "batch" -> TestBatch
+      "todo" -> TestSingle TesterTodo
+      s -> TestSingle (Tester s)
 
 fromTester :: ExternalNames -> Tester -> RdrName
 fromTester names = \case
   Tester name -> mkRdrName name
   TesterTodo -> getRdrName $ name_testTreeTodo names
 
-getTestTreeType :: ExternalNames -> LHsType GhcPs
-getTestTreeType = genLoc . HsTyVar NoExtField NotPromoted . genLoc . getRdrName . name_TestTree
+-- | Return the `[TestTree]` type.
+getListOfTestTreeType :: ExternalNames -> LHsType GhcPs
+getListOfTestTreeType names =
+  (genLoc . HsListTy NoExtField)
+    . (genLoc . HsTyVar NoExtField NotPromoted)
+    $ genLoc testTreeName
+  where
+    testTreeName = getRdrName (name_TestTree names)
+
+-- | Return True if the given type is `[TestTree]`.
+isListOfTestTree :: ExternalNames -> LHsSigWcType GhcPs -> Bool
+isListOfTestTree names ty =
+  case hsib_body $ hswc_body ty of
+    L _ (HsListTy _ (L _ (HsTyVar _ _ (L _ name)))) -> rdrNameOcc name == rdrNameOcc testTreeName
+    _ -> False
+  where
+    testTreeName = getRdrName (name_TestTree names)
 
 {----- Test converter monad -----}
 
@@ -225,11 +255,11 @@ data ConvertTestState = ConvertTestState
   }
 
 data SigInfo = SigInfo
-  { tester :: Tester
+  { testType :: TestType
   -- ^ The parsed tester
   , testName :: Located RdrName
   -- ^ The generated name for the test
-  , testType :: LHsSigWcType GhcPs
+  , testHsType :: LHsSigWcType GhcPs
   -- ^ The type of the test body
   }
 
