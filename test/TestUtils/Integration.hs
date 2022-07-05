@@ -29,6 +29,7 @@ data GHCProject = GHCProject
   , extraGhcArgs :: [Text]
   , files :: [(FilePath, FileContents)]
   , entrypoint :: FilePath
+  , runArgs :: [Text]
   }
 
 {- |
@@ -51,6 +52,7 @@ runTestWith contents f =
           , ("Main.hs", ["{- AUTOCOLLECT.MAIN -}"])
           ]
       , entrypoint = "Main.hs"
+      , runArgs = []
       }
   where
     testFilePrefix =
@@ -81,8 +83,6 @@ runTestWith_ contents f = do
 runghc :: GHCProject -> IO (ExitCode, Text, Text)
 runghc GHCProject{..} =
   withSystemTempDirectory "tasty-autocollect-integration-test" $ \tmpdir -> do
-    let output = tmpdir </> "test"
-
     forM_ files $ \(fp, contents) -> Text.writeFile (tmpdir </> fp) (Text.unlines contents)
 
     let ghcArgs =
@@ -92,15 +92,13 @@ runghc GHCProject{..} =
             , extraGhcArgs
             ]
 
-    ghcResult@(ghcCode, _, _) <-
+    (code, stdout, stderr) <-
       readProcess $
-        setWorkingDir tmpdir . proc "ghc" $
-          entrypoint : "-o" : output : map Text.unpack ghcArgs
-
-    (runCode, stdout, stderr) <-
-      case ghcCode of
-        ExitSuccess -> readProcess $ setWorkingDir tmpdir $ proc output []
-        ExitFailure _ -> return ghcResult
+        setWorkingDir tmpdir . proc "runghc" . concat $
+          [ ["--"]
+          , map Text.unpack ghcArgs
+          , "--" : entrypoint : map Text.unpack runArgs
+          ]
 
     let decode = TextL.toStrict . TextL.decodeUtf8
-    return (runCode, decode stdout, decode stderr)
+    return (code, decode stdout, decode stderr)
