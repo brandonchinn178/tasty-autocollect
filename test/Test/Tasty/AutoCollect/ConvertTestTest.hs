@@ -201,6 +201,24 @@ test_testCase "test_batch generates multiple tests" = do
       | x <- [1 .. 5] :: [Int]
       ]
 
+test_testCase :: Assertion
+test_testCase "test_batch includes where clause" = do
+  (stdout, _) <-
+    assertSuccess . runTest $
+      [ "test_batch :: [TestTree]"
+      , "test_batch ="
+      , "  [ testCase (label x) $ return ()"
+      , "  | x <- [1 .. 5]"
+      , "  ]"
+      , "  where"
+      , "    label x = \"test #\" ++ show x"
+      ]
+  Text.lines stdout
+    @?~ containsAll
+      [ strippedEq (Text.pack $ printf "test #%d: OK" x)
+      | x <- [1 .. 5] :: [Int]
+      ]
+
 test_testGolden :: IO Text
 test_testGolden "test_batch fails when given arguments" "test_batch_args.golden" = do
   (_, stderr) <-

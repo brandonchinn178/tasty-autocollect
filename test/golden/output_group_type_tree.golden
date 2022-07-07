@@ -1,0 +1,27 @@
+Main.hs
+  MyProject
+    Test
+      A
+        X
+          test #1 for AX: OK
+          test #2 for AX: OK
+        Y
+          test #1 for AY: OK
+          test #2 for AY: OK
+        Z
+          test #1 for AZ: OK
+          test #2 for AZ: OK
+        test #1 for A:    OK
+        test #2 for A:    OK
+      B
+        test #1 for B:    OK
+        test #2 for B:    OK
+      C
+        A
+          test #1 for CA: OK
+          test #2 for CA: OK
+        B
+          test #1 for CB: OK
+          test #2 for CB: OK
+
+All 14 tests passed (0.00s)

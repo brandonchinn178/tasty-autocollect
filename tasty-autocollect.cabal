@@ -20,6 +20,9 @@ extra-source-files:
     README.md
     CHANGELOG.md
     test/golden/example.golden
+    test/golden/output_group_type_flat.golden
+    test/golden/output_group_type_modules.golden
+    test/golden/output_group_type_tree.golden
     test/golden/test_batch_args.golden
     test/golden/test_batch_type.golden
 
@@ -104,6 +107,7 @@ test-suite tasty-autocollect-tests
       base
     , bytestring
     , containers
+    , directory
     , explainable-predicates
     , filepath
     , tasty

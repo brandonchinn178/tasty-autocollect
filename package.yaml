@@ -59,6 +59,7 @@ tests:
       - base
       - bytestring
       - containers
+      - directory
       - explainable-predicates
       - filepath
       - tasty
