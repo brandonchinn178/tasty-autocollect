@@ -19,6 +19,7 @@ build-type:     Simple
 extra-source-files:
     README.md
     CHANGELOG.md
+    test/golden/example.golden
 
 source-repository head
   type: git
