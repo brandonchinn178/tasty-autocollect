@@ -126,7 +126,7 @@ generateTests AutoCollectConfig{..} testModules =
        in case (subGroups, mTestsIdentifier) of
             (subGroups', Nothing) -> listify subGroups'
             ([], Just testsIdentifier) -> testsIdentifier
-            (subGroups', Just testsIdentifier) -> "concat " <> listify [listify subGroups', testsIdentifier]
+            (subGroups', Just testsIdentifier) -> "concat " <> listify [testsIdentifier, listify subGroups']
 
 {----- Helpers -----}
 

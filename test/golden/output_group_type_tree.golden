@@ -2,6 +2,8 @@ Main.hs
   MyProject
     Test
       A
+        test #1 for A:    OK
+        test #2 for A:    OK
         X
           test #1 for AX: OK
           test #2 for AX: OK
@@ -11,8 +13,6 @@ Main.hs
         Z
           test #1 for AZ: OK
           test #2 for AZ: OK
-        test #1 for A:    OK
-        test #2 for A:    OK
       B
         test #1 for B:    OK
         test #2 for B:    OK

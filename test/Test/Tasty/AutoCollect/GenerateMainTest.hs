@@ -155,9 +155,9 @@ test_testCase "suffix is stripped before building module tree" = do
       , "  A"
       , "    B"
       , "      C"
+      , "        test1:   OK" -- should be under the same "C" as the "C.DTest" test module
       , "        D"
       , "          test2: OK"
-      , "        test1:   OK" -- should be under the same "C" as the "C.DTest" test module
       ]
   where
     testFiles =
