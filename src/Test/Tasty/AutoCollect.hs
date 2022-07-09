@@ -18,7 +18,7 @@ processFile path file =
     Just (ModuleMain cfg) -> generateMainModule cfg path
     Just ModuleTest ->
       pure . Text.unlines $
-        [ "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.Plugin #-}"
+        [ "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.ConvertTest #-}"
         , file'
         ]
     Nothing -> pure file'

@@ -1,0 +1,24 @@
+Main.hs
+  MyProject.Test.A
+    test #1 for A:  OK
+    test #2 for A:  OK
+  MyProject.Test.A.X
+    test #1 for AX: OK
+    test #2 for AX: OK
+  MyProject.Test.A.Y
+    test #1 for AY: OK
+    test #2 for AY: OK
+  MyProject.Test.A.Z
+    test #1 for AZ: OK
+    test #2 for AZ: OK
+  MyProject.Test.B
+    test #1 for B:  OK
+    test #2 for B:  OK
+  MyProject.Test.C.A
+    test #1 for CA: OK
+    test #2 for CA: OK
+  MyProject.Test.C.B
+    test #1 for CB: OK
+    test #2 for CB: OK
+
+All 14 tests passed (0.00s)

@@ -1,25 +1,69 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module TestUtils.Integration (
+  -- * Status assertions
+  assertSuccess,
+  assertSuccess_,
+  assertAnyFailure,
+  assertAnyFailure_,
+
+  -- * GHCProject
+  FileContents,
+  GHCProject (..),
+  addFiles,
+  modifyFile,
+  runghc,
+
+  -- * Helpers
   runTest,
   runTestWith,
-  runTest_,
-  runTestWith_,
-  GHCProject (..),
-  runghc,
+
+  -- * Re-exports
   ExitCode (..),
 ) where
 
-import Control.Monad (forM_)
+import Control.Monad (forM_, void)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as TextL
 import qualified Data.Text.Lazy.Encoding as TextL
-import System.FilePath ((</>))
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory, (</>))
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process.Typed (ExitCode (..), proc, readProcess, setWorkingDir)
+
+assertStatus :: (ExitCode -> Bool) -> IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertStatus isExpected testResult = do
+  (code, stdout, stderr) <- testResult
+  if isExpected code
+    then return (stdout, stderr)
+    else
+      errorWithoutStackTrace . unlines $
+        [ "Got: " ++ show code
+        , "Stdout: " ++ Text.unpack stdout
+        , "Stderr: " ++ Text.unpack stderr
+        ]
+
+assertSuccess :: IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertSuccess = assertStatus $ \case
+  ExitSuccess -> True
+  ExitFailure _ -> False
+
+assertSuccess_ :: IO (ExitCode, Text, Text) -> IO ()
+assertSuccess_ = void . assertSuccess
+
+assertAnyFailure :: IO (ExitCode, Text, Text) -> IO (Text, Text)
+assertAnyFailure = assertStatus $ \case
+  ExitSuccess -> False
+  ExitFailure _ -> True
+
+assertAnyFailure_ :: IO (ExitCode, Text, Text) -> IO ()
+assertAnyFailure_ = void . assertAnyFailure
+
+{----- GHCProject -----}
 
 -- | Contents of a file broken up by lines.
 type FileContents = [Text]
@@ -29,7 +73,45 @@ data GHCProject = GHCProject
   , extraGhcArgs :: [Text]
   , files :: [(FilePath, FileContents)]
   , entrypoint :: FilePath
+  , runArgs :: [Text]
   }
+
+addFiles :: [(FilePath, FileContents)] -> GHCProject -> GHCProject
+addFiles newFiles proj = proj{files = files proj ++ newFiles}
+
+modifyFile :: FilePath -> (FileContents -> FileContents) -> GHCProject -> GHCProject
+modifyFile path f proj = proj{files = map modify (files proj)}
+  where
+    modify (fp, contents) = (fp, (if fp == path then f else id) contents)
+
+-- | Compile and run the given project.
+runghc :: GHCProject -> IO (ExitCode, Text, Text)
+runghc GHCProject{..} =
+  withSystemTempDirectory "tasty-autocollect-integration-test" $ \tmpdir -> do
+    forM_ files $ \(fp, contents) -> do
+      let testFile = tmpdir </> fp
+      createDirectoryIfMissing True (takeDirectory testFile)
+      Text.writeFile testFile (Text.unlines contents)
+
+    let ghcArgs =
+          concat
+            [ ["-hide-all-packages"]
+            , ["-package " <> dep | dep <- dependencies]
+            , extraGhcArgs
+            ]
+
+    (code, stdout, stderr) <-
+      readProcess $
+        setWorkingDir tmpdir . proc "runghc" . concat $
+          [ ["--"]
+          , map Text.unpack ghcArgs
+          , "--" : entrypoint : map Text.unpack runArgs
+          ]
+
+    let decode = TextL.toStrict . TextL.decodeUtf8
+    return (code, decode stdout, decode stderr)
+
+{----- Helpers -----}
 
 {- |
 Run a test file with tasty-autocollect.
@@ -37,11 +119,11 @@ Run a test file with tasty-autocollect.
 Automatically imports Test.Tasty and Test.Tasty.HUnit.
 -}
 runTest :: FileContents -> IO (ExitCode, Text, Text)
-runTest contents = runTestWith contents id
+runTest = runTestWith id
 
 -- | Same as 'runTest', except allows modifying the project before running.
-runTestWith :: FileContents -> (GHCProject -> GHCProject) -> IO (ExitCode, Text, Text)
-runTestWith contents f =
+runTestWith :: (GHCProject -> GHCProject) -> FileContents -> IO (ExitCode, Text, Text)
+runTestWith f contents =
   runghc . f $
     GHCProject
       { dependencies = ["tasty", "tasty-hunit"]
@@ -51,6 +133,7 @@ runTestWith contents f =
           , ("Main.hs", ["{- AUTOCOLLECT.MAIN -}"])
           ]
       , entrypoint = "Main.hs"
+      , runArgs = []
       }
   where
     testFilePrefix =
@@ -59,48 +142,3 @@ runTestWith contents f =
       , "import Test.Tasty"
       , "import Test.Tasty.HUnit"
       ]
-
--- | Same as 'runTest', except throws an error if the run fails.
-runTest_ :: FileContents -> IO (Text, Text)
-runTest_ contents = runTestWith_ contents id
-
--- | Same as 'runTestWith', except throws an error if the run fails.
-runTestWith_ :: FileContents -> (GHCProject -> GHCProject) -> IO (Text, Text)
-runTestWith_ contents f = do
-  (code, stdout, stderr) <- runTestWith contents f
-  case code of
-    ExitSuccess -> return (stdout, stderr)
-    ExitFailure _ ->
-      errorWithoutStackTrace . unlines $
-        [ "Got: " ++ show code
-        , "Stdout: " ++ Text.unpack stdout
-        , "Stderr: " ++ Text.unpack stderr
-        ]
-
--- | Compile and run the given project.
-runghc :: GHCProject -> IO (ExitCode, Text, Text)
-runghc GHCProject{..} =
-  withSystemTempDirectory "tasty-autocollect-integration-test" $ \tmpdir -> do
-    let output = tmpdir </> "test"
-
-    forM_ files $ \(fp, contents) -> Text.writeFile (tmpdir </> fp) (Text.unlines contents)
-
-    let ghcArgs =
-          concat
-            [ ["-hide-all-packages"]
-            , ["-package " <> dep | dep <- dependencies]
-            , extraGhcArgs
-            ]
-
-    ghcResult@(ghcCode, _, _) <-
-      readProcess $
-        setWorkingDir tmpdir . proc "ghc" $
-          entrypoint : "-o" : output : map Text.unpack ghcArgs
-
-    (runCode, stdout, stderr) <-
-      case ghcCode of
-        ExitSuccess -> readProcess $ setWorkingDir tmpdir $ proc output []
-        ExitFailure _ -> return ghcResult
-
-    let decode = TextL.toStrict . TextL.decodeUtf8
-    return (runCode, decode stdout, decode stderr)

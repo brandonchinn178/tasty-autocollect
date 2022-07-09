@@ -19,6 +19,12 @@ build-type:     Simple
 extra-source-files:
     README.md
     CHANGELOG.md
+    test/golden/example.golden
+    test/golden/output_group_type_flat.golden
+    test/golden/output_group_type_modules.golden
+    test/golden/output_group_type_tree.golden
+    test/golden/test_batch_args.golden
+    test/golden/test_batch_type.golden
 
 source-repository head
   type: git
@@ -35,7 +41,6 @@ library
       Test.Tasty.AutoCollect.GenerateMain
       Test.Tasty.AutoCollect.GHC
       Test.Tasty.AutoCollect.ModuleType
-      Test.Tasty.AutoCollect.Plugin
       Test.Tasty.AutoCollect.Utils.Text
       Test.Tasty.AutoCollect.Utils.TreeMap
       Test.Tasty.Ext.Todo
@@ -82,11 +87,16 @@ test-suite tasty-autocollect-tests
   main-is: Main.hs
   other-modules:
       Examples
+      Test.Tasty.AutoCollect.ConfigTest
+      Test.Tasty.AutoCollect.ConvertTestTest
+      Test.Tasty.AutoCollect.GenerateMainTest
+      Test.Tasty.AutoCollect.ModuleTypeTest
       Test.Tasty.AutoCollect.Utils.TreeMapTest
-      Test.Tasty.AutoCollectTest
       Test.Tasty.Ext.TodoTest
-      TestUtils.Assertion
+      TestUtils.Golden
       TestUtils.Integration
+      TestUtils.Predicates
+      TestUtils.QuickCheck
       Paths_tasty_autocollect
   hs-source-dirs:
       test
@@ -97,6 +107,8 @@ test-suite tasty-autocollect-tests
       base
     , bytestring
     , containers
+    , directory
+    , explainable-predicates
     , filepath
     , tasty
     , tasty-autocollect

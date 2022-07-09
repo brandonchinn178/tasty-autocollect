@@ -11,6 +11,7 @@ maintainer: Brandon Chinn <brandonchinn178@gmail.com>
 extra-source-files:
   - README.md
   - CHANGELOG.md
+  - test/**/*.golden
 
 github: brandonchinn178/tasty-autocollect
 
@@ -58,6 +59,8 @@ tests:
       - base
       - bytestring
       - containers
+      - directory
+      - explainable-predicates
       - filepath
       - tasty
       - tasty-autocollect

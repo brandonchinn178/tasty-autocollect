@@ -1,0 +1,17 @@
+Main.hs
+  test #1 for A:  OK
+  test #2 for A:  OK
+  test #1 for AX: OK
+  test #2 for AX: OK
+  test #1 for AY: OK
+  test #2 for AY: OK
+  test #1 for AZ: OK
+  test #2 for AZ: OK
+  test #1 for B:  OK
+  test #2 for B:  OK
+  test #1 for CA: OK
+  test #2 for CA: OK
+  test #1 for CB: OK
+  test #2 for CB: OK
+
+All 14 tests passed (0.00s)

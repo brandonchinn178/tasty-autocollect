@@ -6,9 +6,9 @@ module Test.Tasty.AutoCollect.GenerateMain (
   generateMainModule,
 ) where
 
-import Data.Bifunctor (first)
+import Data.List (sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -17,20 +17,21 @@ import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
+import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.ModuleType
 import Test.Tasty.AutoCollect.Utils.Text
 import qualified Test.Tasty.AutoCollect.Utils.TreeMap as TreeMap
 
 generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
 generateMainModule cfg@AutoCollectConfig{..} path = do
-  testModules <- findTestModules path
+  testModules <- sortOn displayName <$> findTestModules cfg path
   pure . Text.unlines $
     [ "{-# OPTIONS_GHC -w #-}"
     , ""
     , "module Main (main) where"
     , ""
     , "import Test.Tasty"
-    , Text.unlines $ map ("import qualified " <>) testModules
+    , Text.unlines . map ("import qualified " <>) $ map moduleName testModules ++ ingredientsModules
     , ""
     , "main :: IO ()"
     , "main = defaultMainWithIngredients ingredients (testGroup suiteName tests)"
@@ -47,7 +48,21 @@ generateMainModule cfg@AutoCollectConfig{..} path = do
         , if cfgIngredientsOverride then "[]" else "defaultIngredients"
         ]
 
+    ingredientsModules =
+      flip map cfgIngredients $ \ingredient ->
+        case fst $ Text.breakOnEnd "." ingredient of
+          "" -> autocollectError $ "Ingredient needs to be fully qualified: " <> Text.unpack ingredient
+          -- remove trailing "."
+          s -> Text.init s
+
     suiteName = quoted $ fromMaybe (Text.pack path) cfgSuiteName
+
+data TestModule = TestModule
+  { moduleName :: Text
+  -- ^ e.g. "My.Module.Test1"
+  , displayName :: Text
+  -- ^ The module name to display
+  }
 
 {- |
 Find all test modules using the given path to the Main module.
@@ -55,24 +70,28 @@ Find all test modules using the given path to the Main module.
 >>> findTestModules "test/Main.hs"
 ["My.Module.Test1", "My.Module.Test2", ...]
 -}
-findTestModules :: FilePath -> IO [Text]
-findTestModules path = mapMaybe toModule <$> (filterM isTestModule =<< listDirectoryRecursive testDir)
+findTestModules :: AutoCollectConfig -> FilePath -> IO [TestModule]
+findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestModule
   where
     testDir = takeDirectory path
-    isTestModule = fmap ((== Just ModuleTest) . parseModuleType) . Text.readFile
-    toModule fp =
-      case splitExtensions (makeRelative testDir fp) of
-        (name, ".hs") -> Just (Text.replace "/" "." . Text.pack $ name)
-        _ -> Nothing
 
-    filterM :: Monad m => (a -> m Bool) -> [a] -> m [a]
-    filterM _ [] = pure []
-    filterM f (x : xs) = do
-      b <- f x
-      let update = if b then (x :) else id
-      update <$> filterM f xs
+    toTestModule fp = do
+      fileContents <- Text.readFile fp
+      return $
+        case (splitExtensions fp, parseModuleType fileContents) of
+          ((fpNoExt, ".hs"), Just ModuleTest) ->
+            let moduleName = Text.replace "/" "." . Text.pack . makeRelative testDir $ fpNoExt
+             in Just
+                  TestModule
+                    { moduleName
+                    , displayName = withoutSuffix (cfgStripSuffix cfg) moduleName
+                    }
+          _ -> Nothing
 
-generateTests :: AutoCollectConfig -> [Text] -> Text
+    mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
+    mapMaybeM f = fmap catMaybes . mapM f
+
+generateTests :: AutoCollectConfig -> [TestModule] -> Text
 generateTests AutoCollectConfig{..} testModules =
   case cfgGroupType of
     AutoCollectGroupFlat ->
@@ -81,13 +100,13 @@ generateTests AutoCollectConfig{..} testModules =
       --   , My.Module.Test2.tests
       --   , ...
       --   ]
-      "concat " <> listify (map snd testModulesInfo)
+      "concat " <> listify (map (addTestList . moduleName) testModules)
     AutoCollectGroupModules ->
       -- [ testGroup "My.Module.Test1" My.Module.Test1.tests
       -- , testGroup "My.Module.Test2" My.Module.Test2.tests
       -- ]
-      listify . flip map testModulesInfo $ \(testModuleDisplay, testsIdentifier) ->
-        Text.unwords ["testGroup", quoted testModuleDisplay, testsIdentifier]
+      listify . flip map testModules $ \TestModule{..} ->
+        Text.unwords ["testGroup", quoted displayName, addTestList moduleName]
     AutoCollectGroupTree ->
       -- [ testGroup "My"
       --     [ testGroup "Module"
@@ -96,15 +115,10 @@ generateTests AutoCollectConfig{..} testModules =
       --         ]
       --     ]
       -- ]
-      TreeMap.foldTreeMap testGroupFromTree . TreeMap.fromList $ map (first (Text.splitOn ".")) testModulesInfo
+      let getInfo TestModule{..} = (Text.splitOn "." displayName, addTestList moduleName)
+       in TreeMap.foldTreeMap testGroupFromTree . TreeMap.fromList . map getInfo $ testModules
   where
-    -- List of pairs representing (display name of module, 'tests' identifier)
-    testModulesInfo =
-      flip map testModules $ \testModule ->
-        ( withoutSuffix cfgStripSuffix testModule
-        , testModule <> "." <> Text.pack testListIdentifier
-        )
-
+    addTestList moduleName = moduleName <> "." <> Text.pack testListIdentifier
     testGroupFromTree mTestsIdentifier subTrees =
       let subGroups =
             flip map (Map.toAscList subTrees) $ \(testModuleDisplay, subTests) ->
@@ -112,7 +126,7 @@ generateTests AutoCollectConfig{..} testModules =
        in case (subGroups, mTestsIdentifier) of
             (subGroups', Nothing) -> listify subGroups'
             ([], Just testsIdentifier) -> testsIdentifier
-            (subGroups', Just testsIdentifier) -> "concat " <> listify [listify subGroups', testsIdentifier]
+            (subGroups', Just testsIdentifier) -> "concat " <> listify [testsIdentifier, listify subGroups']
 
 {----- Helpers -----}
 

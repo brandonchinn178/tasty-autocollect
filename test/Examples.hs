@@ -22,4 +22,4 @@ test_testProperty :: [Int] -> Property
 test_testProperty "reverse . reverse === id" = \xs -> (reverse . reverse) xs === id xs
 
 test_goldenVsString :: IO ByteString
-test_goldenVsString "Example golden test" "example.golden" = pure "example"
+test_goldenVsString "Example golden test" "test/golden/example.golden" = pure "example"

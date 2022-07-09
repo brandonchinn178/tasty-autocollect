@@ -10,6 +10,4 @@ autocollectError msg =
     [ ""
     , "******************** tasty-autocollect failure ********************"
     , msg
-    , ""
-    , "Please report this as a bug at: https://github.com/brandonchinn178/tasty-autocollect/issues/"
     ]
