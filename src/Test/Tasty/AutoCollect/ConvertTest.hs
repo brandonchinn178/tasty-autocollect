@@ -27,8 +27,6 @@ plugin :: Plugin
 plugin =
   defaultPlugin
     { dynflagsPlugin = \_ df ->
-        -- TODO: for some reason, without Opt_KeepRawTokenStream, we get
-        -- unused-top-binds errors for generated exports. Ticket?
         pure $ df `gopt_set` Opt_KeepRawTokenStream
     , pluginRecompile = purePlugin
     , parsedResultAction = \_ _ modl -> do
