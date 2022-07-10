@@ -6,7 +6,7 @@ module Test.Tasty.AutoCollect.ConvertTestTest (
   -- $AUTOCOLLECT.TEST.export$
 ) where
 
-import Data.Maybe (maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
@@ -71,16 +71,25 @@ test_batch =
       , ""
       , "foo :: a -> Assertion -> TestTree"
       , "foo _ = testCase \"test helper\""
+      , extraCode
       ]
-  | (label, arg) <-
-      [ ("literal int", "1")
-      , ("literal float", "1.5")
-      , ("literal empty list", "[]")
-      , ("literal list", "[1,2,3]")
-      , ("literal tuple", "(1, True)")
-      , ("constructor", "(Just True)")
-      ]
+  | (label, arg, extraCode) <-
+      catMaybes
+        [ test "literal int" "1" simple
+        , test "literal float" "1.5" simple
+        , test "literal empty list" "[]" simple
+        , test "literal list" "[1,2,3]" simple
+        , test "literal tuple" "(1, True)" simple
+        , test "constructor" "(Just True)" simple
+        , test "infix constructor" "(1 :+ 2)" (withExtra "data Foo = (:+) Int Int")
+        , test "record constructor" "Foo{a = 1}" (withExtra "data Foo = Foo{a :: Int}")
+        , test "type signature" "(1 :: Int)" simple
+        ]
   ]
+  where
+    test label arg f = f $ Just (label, arg, "" :: Text)
+    simple = id
+    withExtra extraCode = fmap (\(label, arg, _) -> (label, arg, extraCode))
 
 test_testCase :: Assertion
 test_testCase "test body can use definitions in where clause" = do
