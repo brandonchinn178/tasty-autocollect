@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Tasty.AutoCollect.GHC (
+  module Test.Tasty.AutoCollect.GHC.Shim,
+
   -- * Parsers
   getCommentContent,
 
@@ -25,17 +27,13 @@ module Test.Tasty.AutoCollect.GHC (
   thNameToGhcNameIO,
 ) where
 
+import Data.IORef (IORef)
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Text as Text
-import GHC.Hs
-import GHC.IORef (IORef)
-import GHC.Parser.Annotation (AnnotationComment (..))
-import GHC.Plugins
-import GHC.Types.Name.Cache (NameCache)
-import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
+import Test.Tasty.AutoCollect.GHC.Shim
 import Test.Tasty.AutoCollect.Utils.Text
 
 {----- Parsers -----}
@@ -87,19 +85,19 @@ firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 getSpanLine :: Located a -> String
 getSpanLine loc =
   case srcSpanStart $ getLoc loc of
-    RealSrcLoc srcLoc _ -> "line " ++ show (srcLocLine srcLoc)
-    UnhelpfulLoc s -> unpackFS s
+    Right srcLoc -> "line " ++ show (srcLocLine srcLoc)
+    Left s -> s
 
 {----- Name utilities -----}
 
 mkRdrName :: String -> RdrName
-mkRdrName = mkRdrUnqual . mkOccName NameSpace.varName
+mkRdrName = mkRdrUnqual . mkOccNameVar
 
 mkLRdrName :: String -> Located RdrName
 mkLRdrName = genLoc . mkRdrName
 
 mkRdrNameType :: String -> RdrName
-mkRdrNameType = mkRdrUnqual . mkOccName NameSpace.tcName
+mkRdrNameType = mkRdrUnqual . mkOccNameTC
 
 mkLRdrNameType :: String -> Located RdrName
 mkLRdrNameType = genLoc . mkRdrNameType

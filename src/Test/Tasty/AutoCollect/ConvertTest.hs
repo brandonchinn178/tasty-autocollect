@@ -12,10 +12,6 @@ import Data.Foldable (toList)
 import Data.List (intercalate, stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
-import GHC.Driver.Main (getHscEnv)
-import GHC.Hs
-import GHC.Parser.Annotation (getAnnotationComments)
-import GHC.Plugins hiding (getHscEnv)
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error

@@ -6,7 +6,6 @@ module Test.Tasty.AutoCollect.ExternalNames (
   loadExternalNames,
 ) where
 
-import GHC.Plugins
 import Test.Tasty (TestTree)
 
 import Test.Tasty.AutoCollect.Error

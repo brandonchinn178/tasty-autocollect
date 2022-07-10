@@ -29,6 +29,13 @@ when:
 
 library:
   source-dirs: src
+  other-modules:
+    - Test.Tasty.AutoCollect.GHC
+    - Test.Tasty.AutoCollect.GHC.Shim
+  when:
+    - condition: impl(ghc >= 9.0) && impl(ghc < 9.2)
+      other-modules:
+        - Test.Tasty.AutoCollect.GHC.Shim_9_0
   dependencies:
     - base >= 4.14 && < 5
     - containers >= 0.6.4.1 && < 0.7
