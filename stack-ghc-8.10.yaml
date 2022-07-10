@@ -1,4 +1,7 @@
 resolver: lts-18.28
 
+extra-deps:
+- explainable-predicates-0.1.2.1
+
 ghc-options:
   '$locals': -Werror

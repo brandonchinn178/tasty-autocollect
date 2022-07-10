@@ -76,9 +76,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
     updateExports loc
-      | RealSrcSpan realSrcSpan _ <- getLoc loc
+      | Just realSrcSpan <- toRealSrcSpan $ getLoc loc
       , Just exportSpan <- firstLocatedWhere getTestExportAnnSrcSpan (getCommentsAt realSrcSpan) =
-          (L (RealSrcSpan exportSpan Nothing) exportIE :) <$> loc
+          (L (fromRealSrcSpan exportSpan) exportIE :) <$> loc
       | otherwise =
           loc
     getTestExportAnnSrcSpan loc =
@@ -107,10 +107,10 @@ return it unmodified
 -}
 convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
 convertTest names loc =
-  case unLoc loc of
+  case parseDecl loc of
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: [TestTree]
-    SigD _ (TypeSig _ [funcName] ty)
+    Just (FuncSig [funcName] ty)
       | Just testType <- parseTestType funcName -> do
           testName <- getNextTestName
           setLastSeenSig
@@ -122,7 +122,7 @@ convertTest names loc =
           pure (genFuncSig testName (getListOfTestTreeType names) <$ loc)
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = [testCase "test name" (<body> :: Assertion)]
-    ValD _ (FunBind _ funcName funcMatchGroup _)
+    Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType funcName -> do
           (testName, funcBodyType) <-
             getLastSeenSig >>= \case
@@ -131,21 +131,19 @@ convertTest names loc =
                 | testType == testTypeFromSig -> pure (testName, testHsType)
                 | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-          let MG{mg_alts = L _ funcMatches} = funcMatchGroup
-          funcMatch <-
-            case funcMatches of
+          FuncSingleDef{..} <-
+            case funcDefs of
               [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
-              [L _ funcMatch] -> pure funcMatch
+              [funcDef] -> pure $ unLoc funcDef
               _ ->
                 autocollectError . unlines $
-                  [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcMatches)
+                  [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
                   , "Did you forget to add a type annotation for a test?"
                   ]
 
-          let Match{m_pats = funcArgs, m_grhss = GRHSs{grhssGRHSs, grhssLocalBinds = whereClause}} = funcMatch
           funcBody <-
-            case grhssGRHSs of
-              [L _ (GRHS _ [] funcBody)] -> pure funcBody
+            case funcDefGuards of
+              [FuncGuardedBody [] body] -> pure body
               _ ->
                 autocollectError . unlines $
                   [ "Test should have no guards."
@@ -159,14 +157,14 @@ convertTest names loc =
                   TestSingle tester ->
                     genList
                       [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
-                          map patternToExpr funcArgs ++ [funcBodyWithType]
+                          map patternToExpr funcDefArgs ++ [funcBodyWithType]
                       ]
                   TestBatch
-                    | not (null funcArgs) -> autocollectError "test_batch should not be used with arguments"
+                    | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
                     | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
                     | otherwise -> funcBodyWithType
 
-          pure (genFuncDecl testName [] testBody (Just whereClause) <$ loc)
+          pure (genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ loc)
     -- anything else leave unmodified
     _ -> pure loc
 
@@ -175,30 +173,30 @@ Convert the given pattern to the expression that it would represent
 if it were in an expression context.
 -}
 patternToExpr :: LPat GhcPs -> LHsExpr GhcPs
-patternToExpr lpat =
-  case unLoc lpat of
-    WildPat{} -> unsupported "wildcard patterns"
-    VarPat _ name -> genLoc $ HsVar NoExtField name
-    LazyPat{} -> unsupported "lazy patterns"
-    AsPat{} -> unsupported "as patterns"
-    ParPat _ p -> genLoc $ HsPar NoExtField $ patternToExpr p
-    BangPat{} -> unsupported "bang patterns"
-    ListPat _ ps -> genList $ map patternToExpr ps
-    TuplePat _ ps boxity -> genLoc $ ExplicitTuple NoExtField (map (genLoc . Present NoExtField . patternToExpr) ps) boxity
-    SumPat{} -> unsupported "anonymous sum patterns"
-    ConPat _ conName conDetails ->
-      case conDetails of
-        PrefixCon args -> mkHsApps (lhsvar conName) $ map patternToExpr args
-        RecCon fields -> genLoc $ RecordCon NoExtField conName $ patternToExpr <$> fields
-        InfixCon l r -> mkHsApps (lhsvar conName) $ map patternToExpr [l, r]
-    ViewPat{} -> unsupported "view patterns"
-    SplicePat _ splice -> genLoc $ HsSpliceE NoExtField splice
-    LitPat _ lit -> genLoc $ HsLit NoExtField lit
-    NPat _ lit _ _ -> genLoc $ HsOverLit NoExtField (unLoc lit)
-    NPlusKPat{} -> unsupported "n+k patterns"
-    SigPat _ p (HsPS _ ty) -> genLoc $ ExprWithTySig NoExtField (patternToExpr p) $ mkLHsSigWcType (genLoc (unLoc ty))
+patternToExpr lpat = go (parsePat lpat)
   where
     unsupported label = autocollectError $ label ++ " unsupported as test argument at " ++ getSpanLine lpat
+    go = \case
+      PatWildCard -> unsupported "wildcard patterns"
+      PatVar name -> genLoc $ HsVar NoExtField name
+      PatLazy -> unsupported "lazy patterns"
+      PatAs -> unsupported "as patterns"
+      PatParens p -> genLoc $ HsPar NoExtField $ go p
+      PatBang -> unsupported "bang patterns"
+      PatList ps -> genList $ map go ps
+      PatTuple ps boxity -> genLoc $ ExplicitTuple NoExtField (map (genLoc . Present NoExtField . go) ps) boxity
+      PatSum -> unsupported "anonymous sum patterns"
+      PatConstructor name details ->
+        case details of
+          PrefixCon args -> mkHsApps (lhsvar name) $ map go args
+          RecCon fields -> genLoc $ RecordCon NoExtField name $ go <$> fields
+          InfixCon l r -> mkHsApps (lhsvar name) $ map go [l, r]
+      PatView -> unsupported "view patterns"
+      PatSplice splice -> genLoc $ HsSpliceE NoExtField splice
+      PatLiteral lit -> genLoc $ HsLit NoExtField lit
+      PatOverloadedLit lit -> genLoc $ HsOverLit NoExtField (unLoc lit)
+      PatNPlusK -> unsupported "n+k patterns"
+      PatTypeSig p ty -> genLoc $ ExprWithTySig NoExtField (go p) $ mkLHsSigWcType (genLoc (unLoc ty))
 
 -- | Identifier for the generated `tests` list.
 testListName :: Located RdrName
