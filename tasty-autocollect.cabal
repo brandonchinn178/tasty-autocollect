@@ -64,6 +64,9 @@ library
     ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   if impl(ghc < 8.8)
     ghc-options: -Wnoncanonical-monadfail-instances
+  if impl(ghc >= 9.2) && impl(ghc < 9.4)
+    other-modules:
+        Test.Tasty.AutoCollect.GHC.Shim_9_2
   if impl(ghc >= 9.0) && impl(ghc < 9.2)
     other-modules:
         Test.Tasty.AutoCollect.GHC.Shim_9_0

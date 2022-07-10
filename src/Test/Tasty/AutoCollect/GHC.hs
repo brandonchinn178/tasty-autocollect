@@ -4,14 +4,11 @@
 module Test.Tasty.AutoCollect.GHC (
   module Test.Tasty.AutoCollect.GHC.Shim,
 
-  -- * Parsers
-  getCommentContent,
-
   -- * Builders
   genFuncSig,
   genFuncDecl,
-  genList,
   lhsvar,
+  mkHsAppTypes,
 
   -- * Located utilities
   genLoc,
@@ -27,64 +24,52 @@ module Test.Tasty.AutoCollect.GHC (
   thNameToGhcNameIO,
 ) where
 
+import Data.Foldable (foldl')
 import Data.IORef (IORef)
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import qualified Data.Text as Text
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim
-import Test.Tasty.AutoCollect.Utils.Text
-
-{----- Parsers -----}
-
-getCommentContent :: RealLocated AnnotationComment -> String
-getCommentContent = Text.unpack . Text.strip . unwrapComment . unLoc
-  where
-    unwrapComment = \case
-      AnnDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
-      AnnDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
-      AnnDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
-      AnnDocSection _ s -> Text.pack s
-      AnnDocOptions s -> Text.pack s
-      AnnLineComment s -> withoutPrefix "--" $ Text.pack s
-      AnnBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
 
 {----- Builders -----}
 
-genFuncSig :: Located RdrName -> LHsType GhcPs -> HsDecl GhcPs
+genFuncSig :: LocatedN RdrName -> LHsType GhcPs -> HsDecl GhcPs
 genFuncSig funcName funcType =
-  SigD NoExtField
-    . TypeSig NoExtField [funcName]
-    . mkLHsSigWcType
+  SigD noExtField
+    . TypeSig noAnn [funcName]
+    . hsTypeToHsSigWcType
     $ funcType
 
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
-genFuncDecl :: Located RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (LHsLocalBinds GhcPs) -> HsDecl GhcPs
+genFuncDecl :: LocatedN RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (HsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
   ValD NoExtField . mkFunBind Generated funcName $
     [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
     ]
   where
-    funcWhere = fromMaybe (genLoc emptyLocalBinds) mFuncWhere
+    funcWhere = fromMaybe emptyLocalBinds mFuncWhere
 
-genList :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-genList = genLoc . ExplicitList NoExtField Nothing
-
-lhsvar :: Located RdrName -> LHsExpr GhcPs
+lhsvar :: LocatedN RdrName -> LHsExpr GhcPs
 lhsvar = genLoc . HsVar NoExtField
+
+mkHsAppTypes :: LHsExpr GhcPs -> [LHsType GhcPs] -> LHsExpr GhcPs
+mkHsAppTypes = foldl' mkHsAppType
+
+mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
+mkHsAppType e t = genLoc $ HsAppType xAppTypeE e (HsWC noExtField t)
 
 {----- Located utilities -----}
 
-genLoc :: e -> Located e
-genLoc = L generatedSrcSpan
+genLoc :: e -> GenLocated (SrcAnn ann) e
+genLoc = L generatedSrcAnn
 
 firstLocatedWhere :: Ord l => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
 firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 
-getSpanLine :: Located a -> String
+getSpanLine :: GenLocated (SrcSpanAnn' a) e -> String
 getSpanLine loc =
-  case srcSpanStart $ getLoc loc of
+  case srcSpanStart $ getLocA loc of
     Right srcLoc -> "line " ++ show (srcLocLine srcLoc)
     Left s -> s
 
@@ -93,16 +78,16 @@ getSpanLine loc =
 mkRdrName :: String -> RdrName
 mkRdrName = mkRdrUnqual . mkOccNameVar
 
-mkLRdrName :: String -> Located RdrName
+mkLRdrName :: String -> LocatedN RdrName
 mkLRdrName = genLoc . mkRdrName
 
 mkRdrNameType :: String -> RdrName
 mkRdrNameType = mkRdrUnqual . mkOccNameTC
 
-mkLRdrNameType :: String -> Located RdrName
+mkLRdrNameType :: String -> LocatedN RdrName
 mkLRdrNameType = genLoc . mkRdrNameType
 
-fromRdrName :: Located RdrName -> String
+fromRdrName :: LocatedN RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
 
 -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492

@@ -34,6 +34,9 @@ library:
     - Test.Tasty.AutoCollect.GHC.Shim
     - Test.Tasty.AutoCollect.GHC.Shim_Common
   when:
+    - condition: impl(ghc >= 9.2) && impl(ghc < 9.4)
+      other-modules:
+        - Test.Tasty.AutoCollect.GHC.Shim_9_2
     - condition: impl(ghc >= 9.0) && impl(ghc < 9.2)
       other-modules:
         - Test.Tasty.AutoCollect.GHC.Shim_9_0

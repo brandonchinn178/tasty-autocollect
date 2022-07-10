@@ -1,6 +1,13 @@
 {- AUTOCOLLECT.TEST -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+#if __GLASGOW_HASKELL__ >= 902
+#define __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__ True
+#else
+#define __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__ False
+#endif
 
 module Test.Tasty.AutoCollect.ConvertTestTest (
   -- $AUTOCOLLECT.TEST.export$
@@ -83,6 +90,7 @@ test_batch =
         , test "constructor" "(Just True)" simple
         , test "infix constructor" "(1 :+ 2)" (withExtra "data Foo = (:+) Int Int")
         , test "record constructor" "Foo{a = 1}" (withExtra "data Foo = Foo{a :: Int}")
+        , test "constructor with type args" "(Just @Int 1)" (onlyWhen __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__)
         , test "type signature" "(1 :: Int)" simple
         ]
   ]
@@ -90,6 +98,20 @@ test_batch =
     test label arg f = f $ Just (label, arg, "" :: Text)
     simple = id
     withExtra extraCode = fmap (\(label, arg, _) -> (label, arg, extraCode))
+    onlyWhen b = if b then id else const Nothing
+
+test_batch :: [TestTree]
+test_batch =
+  [ testCase "plugin propagates constructor type args correctly" $ do
+    (_, stderr) <-
+      assertAnyFailure . runTest $
+        [ "test_foo :: Assertion"
+        , "test_foo (Just @Int True) \"a test\" = return ()"
+        , "  where foo = const testCase"
+        ]
+    stderr @?~ hasSubstr "Couldn't match expected type ‘Int’ with actual type ‘Bool’"
+  | __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__
+  ]
 
 test_testCase :: Assertion
 test_testCase "test body can use definitions in where clause" = do

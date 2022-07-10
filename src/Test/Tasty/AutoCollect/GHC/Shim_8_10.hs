@@ -9,9 +9,15 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
 
   -- * Compat
 
+  -- ** Plugin
+  setKeepRawTokenStream,
+
+  -- ** Annotations
+  getExportComments,
+  generatedSrcAnn,
+  toSrcAnnA,
+
   -- ** SrcSpan
-  fromRealSrcSpan,
-  toRealSrcSpan,
   srcSpanStart,
 
   -- ** OccName
@@ -21,41 +27,87 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
   -- ** Decl
   parseDecl,
 
+  -- ** Type
+  parseSigWcType,
+  parseType,
+
   -- ** Pat
   parsePat,
 
+  -- ** Expr
+  mkExplicitList,
+  mkExplicitTuple,
+  xAppTypeE,
+
   -- * Backports
-  getAnnotationComments,
+  SrcAnn,
+  SrcSpanAnn',
+  LocatedN,
   unLoc,
   getLoc,
+  getLocA,
   mkHsApps,
-  generatedSrcSpan,
+  mkMatch,
+  noAnn,
+  hsTypeToHsSigType,
+  hsTypeToHsSigWcType,
 ) where
 
 -- Re-exports
 import ApiAnnotation as X (AnnotationComment (..))
-import GHC.Hs as X
+import GHC.Hs as X hiding (mkHsAppType, mkHsAppTypes, mkMatch)
 import GhcPlugins as X hiding (getHscEnv, getLoc, srcSpanStart, unLoc)
 import HscMain as X (getHscEnv)
 import NameCache as X (NameCache)
 
-import ApiAnnotation (ApiAnns)
-import qualified ApiAnnotation as GHC (getAnnotationComments)
+import ApiAnnotation (getAnnotationComments)
 import Data.Foldable (foldl')
 import Data.Maybe (mapMaybe)
+import qualified Data.Text as Text
+import qualified GHC.Hs.Utils as GHC (mkMatch)
 import qualified OccName as NameSpace (tcName, varName)
 import qualified SrcLoc as GHC (srcSpanStart)
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
+import Test.Tasty.AutoCollect.Utils.Text
+
+{----- Compat / Plugin -----}
+
+setKeepRawTokenStream :: Plugin -> Plugin
+setKeepRawTokenStream plugin =
+  plugin
+    { dynflagsPlugin = \_ df ->
+        pure $ df `gopt_set` Opt_KeepRawTokenStream
+    }
+
+{----- Compat / Annotations -----}
+
+-- | Get the contents of all comments in the given hsmodExports list.
+getExportComments :: HsParsedModule -> Located [LIE GhcPs] -> [RealLocated String]
+getExportComments parsedModl = map fromRLAnnotationComment . getCommentsAt . getLoc
+  where
+    getCommentsAt = mapMaybe toRealLocated . getAnnotationComments (hpm_annotations parsedModl)
+    toRealLocated = \case
+      L (RealSrcSpan l) e -> Just (L l e)
+      L (UnhelpfulSpan _) _ -> Nothing
+    fromRLAnnotationComment (L rss comment) =
+      L rss $ (Text.unpack . Text.strip . unwrap) comment
+    unwrap = \case
+      AnnDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
+      AnnDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
+      AnnDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
+      AnnDocSection _ s -> Text.pack s
+      AnnDocOptions s -> Text.pack s
+      AnnLineComment s -> withoutPrefix "--" $ Text.pack s
+      AnnBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
+
+generatedSrcAnn :: SrcSpan
+generatedSrcAnn = UnhelpfulSpan (fsLit "<generated>")
+
+toSrcAnnA :: RealSrcSpan -> SrcSpan
+toSrcAnnA = RealSrcSpan
 
 {----- Compat / SrcSpan -----}
-
-fromRealSrcSpan :: RealSrcSpan -> SrcSpan
-fromRealSrcSpan = RealSrcSpan
-
-toRealSrcSpan :: SrcSpan -> Maybe RealSrcSpan
-toRealSrcSpan (RealSrcSpan x) = Just x
-toRealSrcSpan (UnhelpfulSpan _) = Nothing
 
 srcSpanStart :: SrcSpan -> Either String RealSrcLoc
 srcSpanStart ss =
@@ -89,13 +141,28 @@ parseDecl (L _ decl) =
         FuncSingleDef
           { funcDefArgs = m_pats
           , funcDefGuards = map (parseFuncGuardedBody . unLoc) bodys
-          , funcDefWhereClause = whereClause
+          , funcDefWhereClause = unLoc whereClause
           }
       Match{m_grhss = XGRHSs x} -> noExtCon x
       XMatch x -> noExtCon x
     parseFuncGuardedBody = \case
       GRHS _ guards body -> FuncGuardedBody guards body
       XGRHS x -> noExtCon x
+
+{----- Compat / Type -----}
+
+parseSigWcType :: LHsSigWcType GhcPs -> Maybe ParsedType
+parseSigWcType = \case
+  HsWC _ (HsIB _ ltype) -> parseType ltype
+  HsWC _ (XHsImplicitBndrs x) -> noExtCon x
+  XHsWildCardBndrs x -> noExtCon x
+
+parseType :: LHsType GhcPs -> Maybe ParsedType
+parseType (L _ ty) =
+  case ty of
+    HsTyVar _ flag name -> Just $ TypeVar flag name
+    HsListTy _ t -> TypeList <$> parseType t
+    _ -> Nothing
 
 {----- Compat / Pat -----}
 
@@ -114,9 +181,9 @@ parsePat (L _ pat) =
     ConPatIn name details ->
       PatConstructor name $
         case details of
-          PrefixCon args -> PrefixCon $ map parsePat args
-          RecCon fields -> RecCon $ parsePat <$> fields
-          InfixCon l r -> InfixCon (parsePat l) (parsePat r)
+          PrefixCon args -> ConstructorPrefix [] $ map parsePat args
+          RecCon fields -> ConstructorRecord $ parsePat <$> fields
+          InfixCon l r -> ConstructorInfix (parsePat l) (parsePat r)
     ConPatOut{} -> onlyTC "ConPatOut"
     ViewPat{} -> PatView
     SplicePat _ splice -> PatSplice splice
@@ -133,14 +200,22 @@ parsePat (L _ pat) =
     -- https://gitlab.haskell.org/ghc/ghc/-/commit/c42754d5fdd3c2db554d9541bab22d1b3def4be7
     onlyTC label = error $ "Unexpectedly got: " ++ label
 
+{----- Compat / Expr -----}
+
+mkExplicitList :: [LHsExpr GhcPs] -> HsExpr GhcPs
+mkExplicitList = ExplicitList noExtField Nothing
+
+mkExplicitTuple :: [HsTupArg GhcPs] -> Boxity -> HsExpr GhcPs
+mkExplicitTuple = ExplicitTuple noAnn . map (L generatedSrcAnn)
+
+xAppTypeE :: XAppTypeE GhcPs
+xAppTypeE = noExtField
+
 {----- Backports -----}
 
-getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
-getAnnotationComments anns = mapMaybe toRealLocated . GHC.getAnnotationComments anns . RealSrcSpan
-  where
-    toRealLocated = \case
-      L (RealSrcSpan l) e -> Just (L l e)
-      L (UnhelpfulSpan _) _ -> Nothing
+type SrcAnn ann = SrcSpan
+type SrcSpanAnn' a = SrcSpan
+type LocatedN = Located
 
 unLoc :: GenLocated l e -> e
 unLoc (L _ e) = e
@@ -148,8 +223,20 @@ unLoc (L _ e) = e
 getLoc :: GenLocated l e -> l
 getLoc (L l _) = l
 
+getLocA :: Located e -> SrcSpan
+getLocA = getLoc
+
 mkHsApps :: LHsExpr GhcPs -> [LHsExpr GhcPs] -> LHsExpr GhcPs
 mkHsApps = foldl' mkHsApp
 
-generatedSrcSpan :: SrcSpan
-generatedSrcSpan = UnhelpfulSpan (fsLit "<generated>")
+mkMatch :: HsMatchContext RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> HsLocalBinds GhcPs -> LMatch GhcPs (LHsExpr GhcPs)
+mkMatch ctxt pats expr lbinds = GHC.mkMatch ctxt pats expr (L generatedSrcAnn lbinds)
+
+noAnn :: NoExtField
+noAnn = NoExtField
+
+hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
+hsTypeToHsSigType = mkLHsSigType
+
+hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
+hsTypeToHsSigWcType = mkLHsSigWcType

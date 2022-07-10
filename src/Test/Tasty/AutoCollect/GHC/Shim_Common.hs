@@ -4,28 +4,39 @@ module Test.Tasty.AutoCollect.GHC.Shim_Common (
   ParsedDecl (..),
   FuncSingleDef (..),
   FuncGuardedBody (..),
+  ParsedType (..),
   ParsedPat (..),
+  ConstructorDetails (..),
 ) where
 
 import GHC.Hs
 #if __GLASGOW_HASKELL__ == 810
-import ApiAnnotation (LRdrName)
-import BasicTypes (Boxity)
+import BasicTypes (Boxity, PromotionFlag)
+import RdrName (RdrName)
 import SrcLoc (Located)
 #elif __GLASGOW_HASKELL__ == 900
-import GHC.Parser.Annotation (LRdrName)
-import GHC.Types.Basic (Boxity)
+import GHC.Types.Basic (Boxity, PromotionFlag)
+import GHC.Types.Name.Reader (RdrName)
+import GHC.Types.SrcLoc (Located)
+#elif __GLASGOW_HASKELL__ == 902
+import GHC.Types.Basic (Boxity, PromotionFlag)
+import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.SrcLoc (Located)
 #endif
 
+#if __GLASGOW_HASKELL__ < 902
+type LocatedA = Located
+type LocatedN = Located
+#endif
+
 data ParsedDecl
-  = FuncSig [LRdrName] (LHsSigWcType GhcPs)
-  | FuncDef LRdrName [Located FuncSingleDef]
+  = FuncSig [LocatedN RdrName] (LHsSigWcType GhcPs)
+  | FuncDef (LocatedN RdrName) [LocatedA FuncSingleDef]
 
 data FuncSingleDef = FuncSingleDef
   { funcDefArgs :: [LPat GhcPs]
   , funcDefGuards :: [FuncGuardedBody]
-  , funcDefWhereClause :: LHsLocalBinds GhcPs
+  , funcDefWhereClause :: HsLocalBinds GhcPs
   }
 
 data FuncGuardedBody = FuncGuardedBody
@@ -33,9 +44,13 @@ data FuncGuardedBody = FuncGuardedBody
   , funcDefBody :: LHsExpr GhcPs
   }
 
+data ParsedType
+  = TypeVar PromotionFlag (LocatedN RdrName)
+  | TypeList ParsedType
+
 data ParsedPat
   = PatWildCard
-  | PatVar LRdrName
+  | PatVar (LocatedN RdrName)
   | PatLazy
   | PatAs
   | PatParens ParsedPat
@@ -43,10 +58,15 @@ data ParsedPat
   | PatList [ParsedPat]
   | PatTuple [ParsedPat] Boxity
   | PatSum
-  | PatConstructor LRdrName (HsConDetails ParsedPat (HsRecFields GhcPs ParsedPat))
+  | PatConstructor (LocatedN RdrName) ConstructorDetails
   | PatView
   | PatSplice (HsSplice GhcPs)
   | PatLiteral (HsLit GhcPs)
   | PatOverloadedLit (Located (HsOverLit GhcPs))
   | PatNPlusK
   | PatTypeSig ParsedPat (LHsType GhcPs)
+
+data ConstructorDetails
+  = ConstructorPrefix [LHsType GhcPs] [ParsedPat]
+  | ConstructorRecord (HsRecFields GhcPs ParsedPat)
+  | ConstructorInfix ParsedPat ParsedPat
