@@ -77,7 +77,7 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml') }}
+          key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml', 'package.yaml') }}
       - name: Create sdist bundle
         run: stack sdist --test-tarball --tar-dir .
       - uses: actions/upload-artifact@v3
