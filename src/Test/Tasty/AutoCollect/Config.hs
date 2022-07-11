@@ -20,14 +20,14 @@ data AutoCollectConfig = AutoCollectConfig
   -- ^ The name of the entire test suite
   , cfgGroupType :: AutoCollectGroupType
   -- ^ How tests should be grouped (defaults to "modules")
+  , cfgStripSuffix :: Text
+  -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
+  -- a module @Foo.BarTest@ to @Foo.Bar@.
   , cfgIngredients :: [Text]
   -- ^ A comma-separated list of extra tasty ingredients to include
   , cfgIngredientsOverride :: Bool
   -- ^ If true, 'cfgIngredients' overrides the default tasty ingredients;
   -- otherwise, they're prepended to the list of default ingredients (defaults to false)
-  , cfgStripSuffix :: Text
-  -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
-  -- a module @Foo.BarTest@ to @Foo.Bar@.
   }
   deriving (Show, Eq)
 
@@ -94,14 +94,14 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
         "group_type" -> do
           groupType <- parseGroupType v
           pure $ \cfg -> cfg{cfgGroupType = groupType}
+        "strip_suffix" ->
+          pure $ \cfg -> cfg{cfgStripSuffix = v}
         "ingredients" -> do
           let ingredients = map Text.strip . Text.splitOn "," $ v
           pure $ \cfg -> cfg{cfgIngredients = ingredients}
         "ingredients_override" -> do
           override <- parseBool v
           pure $ \cfg -> cfg{cfgIngredientsOverride = override}
-        "strip_suffix" ->
-          pure $ \cfg -> cfg{cfgStripSuffix = v}
         _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
 
     resolve fs = compose fs defaultConfig

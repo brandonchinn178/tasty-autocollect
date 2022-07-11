@@ -97,6 +97,12 @@ groupTypeOptions =
   , ("tree", AutoCollectGroupTree)
   ]
 
+test_testProperty :: ConfigPiece -> Property
+test_testProperty "parseConfig parses strip_suffix" =
+  \(ConfigPiece v) ->
+    parseConfig ("strip_suffix = " <> v)
+      `satisfies` right (cfgStripSuffix `with` eq v)
+
 test_testProperty :: NonEmptyList HsIdentifier -> Property
 test_testProperty "parseConfig parses ingredients" =
   \(NonEmpty (map getHsIdentifier -> ingredients)) ->
@@ -122,12 +128,6 @@ test_testProperty "parseConfig errors on invalid ingredients_override" =
   \(ConfigPiece v) ->
     Text.toLower v `notElem` ["true", "false"] ==>
       parseConfig ("ingredients_override = " <> v) `satisfies` left (startsWith "Invalid bool:")
-
-test_testProperty :: ConfigPiece -> Property
-test_testProperty "parseConfig parses strip_suffix" =
-  \(ConfigPiece v) ->
-    parseConfig ("strip_suffix = " <> v)
-      `satisfies` right (cfgStripSuffix `with` eq v)
 
 test_testProperty :: ConfigPiece -> ConfigPiece -> Property
 test_testProperty "parseConfig errors on unknown keys" =
