@@ -28,7 +28,7 @@ test_testCase "searches recursively" = do
       , "group_type = modules"
       , "-}"
       ]
-  Text.lines stdout @?~ contains (strippedEq "A.B.C.X.Y.Z")
+  stdout @?~ containsStrippedLine (eq "A.B.C.X.Y.Z")
   where
     testFile =
       [ "{- AUTOCOLLECT.TEST -}"

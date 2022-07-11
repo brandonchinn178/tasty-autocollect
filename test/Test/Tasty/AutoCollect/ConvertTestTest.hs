@@ -13,6 +13,7 @@ module Test.Tasty.AutoCollect.ConvertTestTest (
   -- $AUTOCOLLECT.TEST.export$
 ) where
 
+import Control.Monad (forM_)
 import Data.Maybe (catMaybes, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -122,7 +123,7 @@ test_testCase "test body can use definitions in where clause" = do
       , "  where"
       , "    constant = 42"
       ]
-  Text.lines stdout @?~ contains (strippedEq "a test: OK")
+  stdout @?~ containsStrippedLine (eq "a test: OK")
 
 test_testCase :: Assertion
 test_testCase "test arguments can be defined in where clause" = do
@@ -136,7 +137,7 @@ test_testCase "test arguments can be defined in where clause" = do
       , "constant :: Int"
       , "constant = 42"
       ]
-  Text.lines stdout @?~ contains (strippedEq "constant is 42: OK")
+  stdout @?~ containsStrippedLine (eq "constant is 42: OK")
 
 test_testCase :: Assertion
 test_testCase "test can be defined with arbitrary testers" = do
@@ -148,7 +149,7 @@ test_testCase "test can be defined with arbitrary testers" = do
       , "boolTestCase :: TestName -> Bool -> TestTree"
       , "boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
-  Text.lines stdout @?~ contains (strippedEq "this is a successful test: OK")
+  stdout @?~ containsStrippedLine (eq "this is a successful test: OK")
 
 test_testCase :: Assertion
 test_testCase "test can be defined with arbitrary testers in where clause" = do
@@ -160,7 +161,7 @@ test_testCase "test can be defined with arbitrary testers in where clause" = do
       , "    boolTestCase :: TestName -> Bool -> TestTree"
       , "    boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
-  Text.lines stdout @?~ contains (strippedEq "this is a successful test: OK")
+  stdout @?~ containsStrippedLine (eq "this is a successful test: OK")
 
 test_testCase :: Assertion
 test_testCase "testers can have any number of arguments" =
@@ -186,7 +187,7 @@ test_testCase "tests fail when omitting export comment" = do
       [ "test_testCase :: Assertion"
       , "test_testCase \"a test\" = return ()"
       ]
-  Text.lines stderr @?~ contains (stripped $ startsWith "Module ‘Test’ does not export")
+  stderr @?~ containsStrippedLine (startsWith "Module ‘Test’ does not export")
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test () where"
@@ -199,7 +200,7 @@ test_testCase "test file can omit an explicit export list" = do
       [ "test_testCase :: Assertion"
       , "test_testCase \"a test\" = return ()"
       ]
-  Text.lines stdout @?~ contains (strippedEq "a test: OK")
+  stdout @?~ containsStrippedLine (eq "a test: OK")
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test where"
@@ -226,11 +227,8 @@ test_testCase "test_batch generates multiple tests" = do
       , "  | x <- [1 .. 5]"
       , "  ]"
       ]
-  Text.lines stdout
-    @?~ containsAll
-      [ strippedEq (Text.pack $ printf "test #%d: OK" x)
-      | x <- [1 .. 5] :: [Int]
-      ]
+  forM_ [1 .. 5 :: Int] $ \x ->
+    stdout @?~ containsStrippedLine (eq . Text.pack $ printf "test #%d: OK" x)
 
 test_testCase :: Assertion
 test_testCase "test_batch includes where clause" = do
@@ -244,11 +242,8 @@ test_testCase "test_batch includes where clause" = do
       , "  where"
       , "    label x = \"test #\" ++ show x"
       ]
-  Text.lines stdout
-    @?~ containsAll
-      [ strippedEq (Text.pack $ printf "test #%d: OK" x)
-      | x <- [1 .. 5] :: [Int]
-      ]
+  forM_ [1 .. 5 :: Int] $ \x ->
+    stdout @?~ containsStrippedLine (eq . Text.pack $ printf "test #%d: OK" x)
 
 test_testGolden :: IO Text
 test_testGolden "test_batch fails when given arguments" "test_batch_args.golden" = do
