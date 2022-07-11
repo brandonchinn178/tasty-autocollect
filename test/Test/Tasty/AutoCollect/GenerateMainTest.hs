@@ -43,7 +43,7 @@ test_batch =
   [ testGolden
     ("output for group_type = " <> groupType <> " is as expected")
     ("output_group_type_" <> groupType <> ".golden")
-    $ fmap fst . assertSuccess . runMainWith (setTestFiles testFiles)
+    $ fmap (normalizeTestOutput . fst) . assertSuccess . runMainWith (setTestFiles testFiles)
     $ [ "{- AUTOCOLLECT.MAIN"
       , "group_type = " <> Text.pack groupType
       , "-}"
