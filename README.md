@@ -1,13 +1,254 @@
 # tasty-autocollect
 
-TODO
+[![](https://img.shields.io/github/workflow/status/brandonchinn178/tasty-autocollect/CI/main)](https://github.com/brandonchinn178/tasty-autocollect/actions)
+[![](https://img.shields.io/codecov/c/gh/brandonchinn178/tasty-autocollect)](https://app.codecov.io/gh/brandonchinn178/tasty-autocollect)
+[![](https://img.shields.io/hackage/v/tasty-autocollect)](https://hackage.haskell.org/package/tasty-autocollect)
+
+A preprocessor/compiler plugin that will automatically collect Tasty tests and generate a main file to run all the tests.
 
 Design goals:
 * Don't use any weird syntax so that syntax highlighters, linters, and formatters still work
 * Support test functions with multiple arguments like `tasty-golden`'s API (which `tasty-discover` doesn't easily support)
 * Avoid universally exporting the whole test module, so that GHC can warn about unused test helpers
-* Don't add any of the tasty plugins as explicit dependencies
+* Don't add any of the tasty plugins as dependencies (both as Cabal dependencies and as a result of hardcoded logic)
 
 ## Usage
 
-TODO
+### Quickstart
+
+1. Add the following to your `package.yaml` or `.cabal` file:
+
+    ```yaml
+    tests:
+      my-library-tests:
+        ghc-options: -F -pgmF=tasty-autocollect
+        build-tools:
+          - tasty-autocollect:tasty-autocollect
+        ...
+    ```
+    ```cabal
+    test-suite my-library-tests
+      ghc-options: -F -pgmF=tasty-autocollect
+      build-tool-depends:
+        tasty-autocollect:tasty-autocollect
+      ...
+    ```
+
+1. Write your main file to contain just:
+
+    ```hs
+    {- AUTOCOLLECT.MAIN -}
+    ```
+
+1. Write your tests:
+
+    ```hs
+    {- AUTOCOLLECT.TEST -}
+
+    module MyTest (
+      {- AUTOCOLLECT.TEST.export -}
+    ) where
+
+    import Data.ByteString.Lazy (ByteString)
+    import Test.Tasty.Golden
+    import Test.Tasty.HUnit
+    import Test.Tasty.QuickCheck
+
+    test_testCase :: Assertion
+    test_testCase "Addition" = do
+      1 + 1 @?= (2 :: Int)
+      2 + 2 @?= (4 :: Int)
+
+    test_testProperty :: [Int] -> Property
+    test_testProperty "reverse . reverse === id" = \xs -> (reverse . reverse) xs === id xs
+
+    test_goldenVsString :: IO ByteString
+    test_goldenVsString "Example golden test" "test/golden/example.golden" = pure "example"
+
+    test_testGroup :: [TestTree]
+    test_testGroup "manually defining a test group" =
+      [ testCase "some test" $ return ()
+      , testCase "some other test" $ return ()
+      ]
+    ```
+
+### How it works
+
+The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preprocessor, which does one of three things at the very beginning of compilation:
+
+1. If the file contains `{- AUTOCOLLECT.MAIN -}`, find all test modules and generate a main module.
+2. If the file contains `{- AUTOCOLLECT.TEST -}`, register the `tasty-autocollect` GHC plugin to rewrite tests (see below).
+3. Otherwise, do nothing
+
+In a test file, the plugin will search for any functions starting with `test_`. It will then rewrite the test from the equivalent of:
+
+```hs
+test_TESTER :: TYPE
+test_TESTER ARG1 ARG2 ... = BODY
+```
+
+to the equivalent of:
+
+```hs
+tasty_test_N :: TestTree
+tasty_test_N = TESTER ARG1 ARG2 ... (BODY :: TYPE)
+```
+
+where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
+
+This transformation is mostly transparent, which means you can write your own test helpers and they can be used within this framework seamlessly. This also means that syntax like `where` clauses work pretty much as you expect: the `TESTER` and the `ARG`s can be defined in the `where` clause.
+
+However, because the plugin does need to parse the module first, the arguments will need to be parsable as a function pattern, even though it'll be compiled as an expression. So you can't do something like:
+
+```hs
+test_testCase :: Assertion
+test_testCase (a ++ b) = ...
+```
+
+But you can just rewrite this as:
+
+```hs
+test_testCase :: Assertion
+test_testCase label = ...
+  where
+    label = a ++ b
+```
+
+### Configuration
+
+`tasty-autocollect` can be configured by adding `k = v` lines to the same block comment as `AUTOCOLLECT.MAIN`; e.g.
+
+```hs
+{- AUTOCOLLECT.MAIN
+suite_name = foo
+-}
+```
+
+* `suite_name`: The name to use in the `testGroup` at the root of the test suite `TestTree` (defaults to the path of the main file)
+
+* `group_type`: How the tests should be grouped (defaults to `modules`)
+    * `flat`: All the tests are in the same namespace
+        ```
+        Main.hs
+          test 1: OK
+          test 2: OK
+          test 3: OK
+        ```
+
+    * `modules`: Tests are grouped by their module
+        ```
+        Main.hs
+          Test.Module1
+            test1: OK
+            test2: OK
+          Test.Module2
+            test3: OK
+        ```
+
+    * `tree`: Tests are grouped by their module, which is broken out into a tree
+        ```
+        Main.hs
+          Test
+            Module1
+              test1: OK
+              test2: OK
+            Module2
+              test3: OK
+        ```
+
+* `strip_suffix`: The suffix to strip from a test module, e.g. `strip_suffix = Test` will relabel a `Foo.BarTest` module to `Foo.Bar`
+
+* `ingredients`: A comma-separated list of extra tasty ingredients to include, e.g.
+
+    ```
+    ingredients = SomeLibrary.ingredient1, SomeLibrary.ingredient2
+    ```
+
+* `ingredients_override`: By default, `ingredients` will add the ingredients in front of the default `tasty` ingredients. When `true`, does not automatically include the default `tasty` ingredients, for complete control over the ingredient order.
+
+### Notes
+
+* Note that the type annotation applies to just the body, so if you're writing a QuickCheck test, you'll have to take in the `Arbitrary` arguments as a lambda to the right of the equals sign (or define the function in the `where` clause):
+
+    ```hs
+    test_testProperty :: Int -> Property
+
+    -- BAD
+    test_testProperty "my property" x = x === x
+
+    -- GOOD
+    test_testProperty "my property" = \x -> x === x
+
+    -- ALSO GOOD
+    test_testProperty "my property" = prop
+      where
+        prop x = x === x
+    ```
+
+* If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.
+    * This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
+    * Upstream ticket: https://github.com/tweag/ormolu/issues/906
+
+## Features
+
+In addition to automatically collecting tests, this library also provides some additional functionality out-of-the-box, to make writing + managing tests a seamless experience.
+
+### Marking tests as "TODO"
+
+If you're of the Test Driven Development (TDD) mentality, you might want to specify what tests you want to write before actually writing any code. In this workflow, you might not even know what kind of test you want to write (e.g. HUnit, QuickCheck, etc.).
+
+With `tasty-autocollect`, you can use `test_todo` to write down tests you'd like to write. By default, they'll pass with a "TODO" message, but you can also pass `--fail-todos` at runtime to make them fail instead.
+
+You can write whatever you want in the body of the test, and it'll be typechecked, but won't be used at runtime.
+
+```hs
+test_todo :: ()
+test_todo "a test to implement later" = ()
+
+test_todo :: Assertion
+test_todo "a test that'll compile but won't run" = do
+  x <- myFunction
+  x @?= ...
+```
+
+### Defining batches of tests
+
+With `tasty-autocollect`, you can write a set of tests in one definition without needing to nest them within a test group. For example,
+
+```hs
+test_batch :: [TestTree]
+test_batch =
+  [ testCase ("test #" ++ show x) $ return ()
+  | x <- [1, 5, 10 :: Int]
+  ]
+```
+
+is equivalent to writing:
+
+```hs
+test_testCase :: Assertion
+test_testCase "test #1" = return ()
+
+test_testCase :: Assertion
+test_testCase "test #5" = return ()
+
+test_testCase :: Assertion
+test_testCase "test #10" = return ()
+```
+
+## Comparison with `tasty-discover`
+
+Advantages:
+* Supports test functions with multiple arguments (e.g. `tasty-golden`)
+* Avoids hardcoding testers like `unit_` or `prop_`
+* Avoids rewriting test label twice in function name
+* Avoids test name restrictions
+    * Because `tasty-discover` couples the function name with the test label, you can't do things like use punctuation in the test label. So `tasty-discover` doesn't allow writing the equivalent of `testProperty "reverse . reverse === id"`.
+* More features out-of-the-box (see "Features" section)
+* More configurable
+    * More configuration options
+    * Configuration is more extensible, since configuration is parsed from a comment in the main module instead of as preprocessor arguments
+
+Disadvantages:
+* Uses both a preprocessor and a plugin (`tasty-discover` only uses a preprocessor)
+    * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
