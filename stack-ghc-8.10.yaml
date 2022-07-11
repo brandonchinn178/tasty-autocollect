@@ -1,5 +1,9 @@
 resolver: lts-18.28
 
+# test on older 8.10 compiler because it has
+# lower bounds than 8.10.7
+compiler: ghc-8.10.2
+
 extra-deps:
 - explainable-predicates-0.1.2.1
 
