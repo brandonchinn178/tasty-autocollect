@@ -5,7 +5,6 @@ module Test.Tasty.Ext.TodoTest (
   -- $AUTOCOLLECT.TEST.export$
 ) where
 
-import qualified Data.Text as Text
 import Test.Predicates
 import Test.Predicates.HUnit
 import Test.Tasty.HUnit
@@ -21,7 +20,7 @@ test_testCase "TODO tests appear as successful tests" = do
         [ "test_todo :: ()"
         , "test_todo \"a skipped test\" = ()"
         ]
-  Text.lines stdout @?~ contains (strippedEq "a skipped test: TODO")
+  getTestLines stdout @?~ containsStripped (eq "a skipped test: TODO")
 
 test_testCase :: Assertion
 test_testCase "TODO tests can wrap any type" =
@@ -41,4 +40,4 @@ test_testCase "TODO tests show compilation errors" = do
         [ "test_todo :: Assertion"
         , "test_todo \"partially implemented todo\" = length [] @?= True"
         ]
-  Text.lines stderr @?~ contains (strippedEq "• Couldn't match expected type ‘Int’ with actual type ‘Bool’")
+  getTestLines stderr @?~ containsStripped (eq "• Couldn't match expected type ‘Int’ with actual type ‘Bool’")

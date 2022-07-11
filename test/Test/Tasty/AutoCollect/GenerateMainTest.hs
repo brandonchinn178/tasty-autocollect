@@ -28,7 +28,7 @@ test_testCase "searches recursively" = do
       , "group_type = modules"
       , "-}"
       ]
-  Text.lines stdout @?~ contains (strippedEq "A.B.C.X.Y.Z")
+  getTestLines stdout @?~ containsStripped (eq "A.B.C.X.Y.Z")
   where
     testFile =
       [ "{- AUTOCOLLECT.TEST -}"
@@ -80,7 +80,7 @@ test_testCase "generateMain orders test modules alphabetically" = do
       , "group_type = modules"
       , "-}"
       ]
-  Text.lines stdout
+  getTestLines stdout
     @?~ startsWith
       [ "Main.hs"
       , "  A"
@@ -119,7 +119,7 @@ test_testCase "allows stripping suffix from test modules" = do
       , "strip_suffix = Foo"
       , "-}"
       ]
-  Text.lines stdout
+  getTestLines stdout
     @?~ startsWith
       [ "Main.hs"
       , "  Tests.A"
@@ -149,7 +149,7 @@ test_testCase "suffix is stripped before building module tree" = do
       , "strip_suffix = Test"
       , "-}"
       ]
-  Text.lines stdout
+  getTestLines stdout
     @?~ startsWith
       [ "Main.hs"
       , "  A"
@@ -209,7 +209,7 @@ test_testCase "gives informative error when ingredient lacks module" = do
       , "ingredients = myIngredient"
       , "-}"
       ]
-  Text.lines stderr @?~ contains (eq "Ingredient needs to be fully qualified: myIngredient")
+  getTestLines stderr @?~ contains (eq "Ingredient needs to be fully qualified: myIngredient")
 
 test_testCase :: Assertion
 test_testCase "allows disabling default tasty ingredients" = do

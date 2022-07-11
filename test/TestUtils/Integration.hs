@@ -19,12 +19,15 @@ module TestUtils.Integration (
   -- * Helpers
   runTest,
   runTestWith,
+  getTestLines,
 
   -- * Re-exports
   ExitCode (..),
 ) where
 
 import Control.Monad (forM_, void)
+import Data.Char (isDigit)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -142,3 +145,22 @@ runTestWith f contents =
       , "import Test.Tasty"
       , "import Test.Tasty.HUnit"
       ]
+
+-- | Get and normalize tasty output lines.
+getTestLines :: Text -> [Text]
+getTestLines = map normalize . Text.lines
+  where
+    normalize s
+      | (pre, rest) <- breakOnEnd "(" s
+      , Just inParens <- Text.stripSuffix ")" rest
+      , Just (inParensNum, 's') <- Text.unsnoc inParens
+      , [a, b] <- Text.splitOn "." inParensNum
+      , Text.all isDigit a
+      , Text.all isDigit b =
+          pre
+      | otherwise = s
+
+    -- Text.breakOnEnd, but omits the delimiter
+    breakOnEnd delim s =
+      let (a, b) = Text.breakOnEnd delim s
+       in (fromMaybe a (Text.stripSuffix delim a), b)
