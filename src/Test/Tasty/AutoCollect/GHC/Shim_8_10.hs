@@ -31,9 +31,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
   parseSigWcType,
   parseType,
 
-  -- ** Pat
-  parsePat,
-
   -- ** Expr
   mkExplicitList,
   mkExplicitTuple,
@@ -56,7 +53,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
 -- Re-exports
 import ApiAnnotation as X (AnnotationComment (..))
 import GHC.Hs as X hiding (mkHsAppType, mkHsAppTypes, mkMatch)
-import GhcPlugins as X hiding (getHscEnv, getLoc, srcSpanStart, unLoc)
+import GhcPlugins as X hiding (getHscEnv, getLoc, showPpr, srcSpanStart, unLoc)
 import HscMain as X (getHscEnv)
 import NameCache as X (NameCache)
 
@@ -163,42 +160,6 @@ parseType (L _ ty) =
     HsTyVar _ flag name -> Just $ TypeVar flag name
     HsListTy _ t -> TypeList <$> parseType t
     _ -> Nothing
-
-{----- Compat / Pat -----}
-
-parsePat :: LPat GhcPs -> ParsedPat
-parsePat (L _ pat) =
-  case pat of
-    WildPat{} -> PatWildCard
-    VarPat _ name -> PatVar name
-    LazyPat{} -> PatLazy
-    AsPat{} -> PatAs
-    ParPat _ p -> PatParens (parsePat p)
-    BangPat{} -> PatBang
-    ListPat _ ps -> PatList (map parsePat ps)
-    TuplePat _ ps boxity -> PatTuple (map parsePat ps) boxity
-    SumPat{} -> PatSum
-    ConPatIn name details ->
-      PatConstructor name $
-        case details of
-          PrefixCon args -> ConstructorPrefix [] $ map parsePat args
-          RecCon fields -> ConstructorRecord $ parsePat <$> fields
-          InfixCon l r -> ConstructorInfix (parsePat l) (parsePat r)
-    ConPatOut{} -> onlyTC "ConPatOut"
-    ViewPat{} -> PatView
-    SplicePat _ splice -> PatSplice splice
-    LitPat _ lit -> PatLiteral lit
-    NPat _ lit _ _ -> PatOverloadedLit lit
-    NPlusKPat{} -> PatNPlusK
-    SigPat _ p (HsWC _ (HsIB _ ty)) -> PatTypeSig (parsePat p) ty
-    CoPat{} -> onlyTC "CoPat"
-    -- impossible cases that GHC 8.10 isn't smart enough to prune
-    SigPat _ _ (HsWC _ (XHsImplicitBndrs x)) -> noExtCon x
-    SigPat _ _ (XHsWildCardBndrs x) -> noExtCon x
-    XPat x -> noExtCon x
-  where
-    -- https://gitlab.haskell.org/ghc/ghc/-/commit/c42754d5fdd3c2db554d9541bab22d1b3def4be7
-    onlyTC label = error $ "Unexpectedly got: " ++ label
 
 {----- Compat / Expr -----}
 

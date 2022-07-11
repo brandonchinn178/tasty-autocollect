@@ -4,11 +4,16 @@
 module Test.Tasty.AutoCollect.GHC (
   module Test.Tasty.AutoCollect.GHC.Shim,
 
+  -- * Output helpers
+  showPpr,
+
   -- * Builders
   genFuncSig,
   genFuncDecl,
   lhsvar,
   mkHsAppTypes,
+  mkHsTyVar,
+  mkExprTypeSig,
 
   -- * Located utilities
   genLoc,
@@ -31,6 +36,11 @@ import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim
+
+{----- Output helpers -----}
+
+showPpr :: Outputable a => a -> String
+showPpr = showSDocUnsafe . ppr
 
 {----- Builders -----}
 
@@ -58,6 +68,15 @@ mkHsAppTypes = foldl' mkHsAppType
 
 mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 mkHsAppType e t = genLoc $ HsAppType xAppTypeE e (HsWC noExtField t)
+
+mkHsTyVar :: Name -> LHsType GhcPs
+mkHsTyVar = genLoc . HsTyVar noAnn NotPromoted . genLoc . getRdrName
+
+-- | mkExprTypeSig <e> <t> = (<e> :: <t>)
+mkExprTypeSig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
+mkExprTypeSig e t =
+  genLoc . ExprWithTySig noAnn e $
+    HsWC NoExtField (hsTypeToHsSigType t)
 
 {----- Located utilities -----}
 

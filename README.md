@@ -10,7 +10,7 @@ Design goals:
 * Don't use any weird syntax so that syntax highlighters, linters, and formatters still work
 * Support test functions with multiple arguments like `tasty-golden`'s API (which `tasty-discover` doesn't easily support)
 * Avoid universally exporting the whole test module, so that GHC can warn about unused test helpers
-* Don't add any of the tasty plugins as dependencies (both as Cabal dependencies and as a result of hardcoded logic)
+* Support arbitrary test functions (e.g. user-defined test helpers or third-party tasty libraries)
 
 ## Usage
 
@@ -49,27 +49,28 @@ Design goals:
       {- AUTOCOLLECT.TEST.export -}
     ) where
 
-    import Data.ByteString.Lazy (ByteString)
     import Test.Tasty.Golden
     import Test.Tasty.HUnit
     import Test.Tasty.QuickCheck
 
-    test_testCase :: Assertion
-    test_testCase "Addition" = do
-      1 + 1 @?= (2 :: Int)
-      2 + 2 @?= (4 :: Int)
+    test =
+      testCase "Addition" $ do
+        1 + 1 @?= (2 :: Int)
+        2 + 2 @?= (4 :: Int)
 
-    test_testProperty :: [Int] -> Property
-    test_testProperty "reverse . reverse === id" = \xs -> (reverse . reverse) xs === id xs
+    test =
+      testProperty "reverse . reverse === id" $ \xs ->
+        (reverse . reverse) xs === id (xs :: [Int])
 
-    test_goldenVsString :: IO ByteString
-    test_goldenVsString "Example golden test" "test/golden/example.golden" = pure "example"
+    test =
+      goldenVsString "Example golden test" "test/golden/example.golden" $
+        pure "example"
 
-    test_testGroup :: [TestTree]
-    test_testGroup "manually defining a test group" =
-      [ testCase "some test" $ return ()
-      , testCase "some other test" $ return ()
-      ]
+    test =
+      testGroup "manually defining a test group"
+        [ testCase "some test" $ return ()
+        , testCase "some other test" $ return ()
+        ]
     ```
 
 ### How it works
@@ -80,39 +81,7 @@ The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preproces
 2. If the file contains `{- AUTOCOLLECT.TEST -}`, register the `tasty-autocollect` GHC plugin to rewrite tests (see below).
 3. Otherwise, do nothing
 
-In a test file, the plugin will search for any functions starting with `test_`. It will then rewrite the test from the equivalent of:
-
-```hs
-test_TESTER :: TYPE
-test_TESTER ARG1 ARG2 ... = BODY
-```
-
-to the equivalent of:
-
-```hs
-tasty_test_N :: TestTree
-tasty_test_N = TESTER ARG1 ARG2 ... (BODY :: TYPE)
-```
-
-where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
-
-This transformation is mostly transparent, which means you can write your own test helpers and they can be used within this framework seamlessly. This also means that syntax like `where` clauses work pretty much as you expect: the `TESTER` and the `ARG`s can be defined in the `where` clause.
-
-However, because the plugin does need to parse the module first, the arguments will need to be parsable as a function pattern, even though it'll be compiled as an expression. So you can't do something like:
-
-```hs
-test_testCase :: Assertion
-test_testCase (a ++ b) = ...
-```
-
-But you can just rewrite this as:
-
-```hs
-test_testCase :: Assertion
-test_testCase label = ...
-  where
-    label = a ++ b
-```
+In a test file, the plugin will search for any functions named `test`. It will then rename the function to `tasty_test_N`, where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
 
 ### Configuration
 
@@ -168,23 +137,6 @@ suite_name = foo
 
 ### Notes
 
-* Note that the type annotation applies to just the body, so if you're writing a QuickCheck test, you'll have to take in the `Arbitrary` arguments as a lambda to the right of the equals sign (or define the function in the `where` clause):
-
-    ```hs
-    test_testProperty :: Int -> Property
-
-    -- BAD
-    test_testProperty "my property" x = x === x
-
-    -- GOOD
-    test_testProperty "my property" = \x -> x === x
-
-    -- ALSO GOOD
-    test_testProperty "my property" = prop
-      where
-        prop x = x === x
-    ```
-
 * If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.
     * This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
     * Upstream ticket: https://github.com/tweag/ormolu/issues/906
@@ -199,16 +151,8 @@ If you're of the Test Driven Development (TDD) mentality, you might want to spec
 
 With `tasty-autocollect`, you can use `test_todo` to write down tests you'd like to write. By default, they'll pass with a "TODO" message, but you can also pass `--fail-todos` at runtime to make them fail instead.
 
-You can write whatever you want in the body of the test, and it'll be typechecked, but won't be used at runtime.
-
 ```hs
-test_todo :: ()
-test_todo "a test to implement later" = ()
-
-test_todo :: Assertion
-test_todo "a test that'll compile but won't run" = do
-  x <- myFunction
-  x @?= ...
+test_todo = "a test to implement later"
 ```
 
 ### Defining batches of tests
@@ -216,7 +160,6 @@ test_todo "a test that'll compile but won't run" = do
 With `tasty-autocollect`, you can write a set of tests in one definition without needing to nest them within a test group. For example,
 
 ```hs
-test_batch :: [TestTree]
 test_batch =
   [ testCase ("test #" ++ show x) $ return ()
   | x <- [1, 5, 10 :: Int]
@@ -226,14 +169,11 @@ test_batch =
 is equivalent to writing:
 
 ```hs
-test_testCase :: Assertion
-test_testCase "test #1" = return ()
+test = testCase "test #1" $ return ()
 
-test_testCase :: Assertion
-test_testCase "test #5" = return ()
+test = testCase "test #5" $ return ()
 
-test_testCase :: Assertion
-test_testCase "test #10" = return ()
+test = testCase "test #10" $ return ()
 ```
 
 ## Comparison with `tasty-discover`
