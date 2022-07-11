@@ -67,8 +67,10 @@ tests:
     source-dirs: test
     main: Main.hs
     ghc-options: -F -pgmF=tasty-autocollect
-    build-tools:
-      - tasty-autocollect:tasty-autocollect
+    verbatim:
+      # https://github.com/sol/hpack/issues/516
+      build-tool-depends:
+        tasty-autocollect:tasty-autocollect
     dependencies:
       - base
       - bytestring
