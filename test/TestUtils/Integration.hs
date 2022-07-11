@@ -20,6 +20,7 @@ module TestUtils.Integration (
   runTest,
   runTestWith,
   getTestLines,
+  normalizeTestOutput,
 
   -- * Re-exports
   ExitCode (..),
@@ -148,10 +149,14 @@ runTestWith f contents =
 
 -- | Get and normalize tasty output lines.
 getTestLines :: Text -> [Text]
-getTestLines = map normalize . Text.lines
+getTestLines = Text.lines . normalizeTestOutput
+
+-- https://github.com/UnkindPartition/tasty/issues/341
+normalizeTestOutput :: Text -> Text
+normalizeTestOutput = Text.unlines . map normalize . Text.lines
   where
     normalize s
-      | (pre, rest) <- breakOnEnd "(" s
+      | (pre, rest) <- breakOnEnd " (" s
       , Just inParens <- Text.stripSuffix ")" rest
       , Just (inParensNum, 's') <- Text.unsnoc inParens
       , [a, b] <- Text.splitOn "." inParensNum
