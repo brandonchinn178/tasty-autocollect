@@ -40,7 +40,7 @@ def main():
 
     # check + parse CHANGELOG
     changelog = Path("CHANGELOG.md").read_text()
-    changelog = re.sub(r"^# Unreleased", "", changelog)
+    changelog = re.sub(r"^# Unreleased\n+", "", changelog)
     if not changelog.startswith(f"# {version_name}"):
         raise Exception("CHANGELOG doesn't look updated")
     version_changes = get_version_changes(changelog)
