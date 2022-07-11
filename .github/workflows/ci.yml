@@ -10,10 +10,9 @@ jobs:
     strategy:
       matrix:
         stack_yaml:
-          # TODO: uncomment these
-          # - stack-ghc-8.10.yaml
+          - stack-ghc-8.10.yaml
           - stack-ghc-9.0.yaml
-          # - stack-ghc-9.2.yaml
+          - stack-ghc-9.2.yaml
         include:
           - stack_yaml: stack.yaml
             latest: true

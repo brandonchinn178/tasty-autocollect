@@ -1,12 +1,19 @@
 {- AUTOCOLLECT.TEST -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+#if __GLASGOW_HASKELL__ >= 902
+#define __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__ True
+#else
+#define __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__ False
+#endif
 
 module Test.Tasty.AutoCollect.ConvertTestTest (
   -- $AUTOCOLLECT.TEST.export$
 ) where
 
-import Data.Maybe (maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
@@ -71,15 +78,39 @@ test_batch =
       , ""
       , "foo :: a -> Assertion -> TestTree"
       , "foo _ = testCase \"test helper\""
+      , extraCode
       ]
-  | (label, arg) <-
-      [ ("literal int", "1")
-      , ("literal float", "1.5")
-      , ("literal empty list", "[]")
-      , ("literal list", "[1,2,3]")
-      , ("literal tuple", "(1, True)")
-      , ("constructor", "(Just True)")
-      ]
+  | (label, arg, extraCode) <-
+      catMaybes
+        [ test "literal int" "1" simple
+        , test "literal float" "1.5" simple
+        , test "literal empty list" "[]" simple
+        , test "literal list" "[1,2,3]" simple
+        , test "literal tuple" "(1, True)" simple
+        , test "constructor" "(Just True)" simple
+        , test "infix constructor" "(1 :+ 2)" (withExtra "data Foo = (:+) Int Int")
+        , test "record constructor" "Foo{a = 1}" (withExtra "data Foo = Foo{a :: Int}")
+        , test "constructor with type args" "(Just @Int 1)" (onlyWhen __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__)
+        , test "type signature" "(1 :: Int)" simple
+        ]
+  ]
+  where
+    test label arg f = f $ Just (label, arg, "" :: Text)
+    simple = id
+    withExtra extraCode = fmap (\(label, arg, _) -> (label, arg, extraCode))
+    onlyWhen b = if b then id else const Nothing
+
+test_batch :: [TestTree]
+test_batch =
+  [ testCase "plugin propagates constructor type args correctly" $ do
+    (_, stderr) <-
+      assertAnyFailure . runTest $
+        [ "test_foo :: Assertion"
+        , "test_foo (Just @Int True) \"a test\" = return ()"
+        , "  where foo = const testCase"
+        ]
+    stderr @?~ hasSubstr "Couldn't match expected type ‘Int’ with actual type ‘Bool’"
+  | __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__
   ]
 
 test_testCase :: Assertion

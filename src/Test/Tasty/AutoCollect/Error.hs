@@ -2,7 +2,7 @@ module Test.Tasty.AutoCollect.Error (
   autocollectError,
 ) where
 
-import GHC.Plugins
+import Test.Tasty.AutoCollect.GHC
 
 autocollectError :: String -> a
 autocollectError msg =
