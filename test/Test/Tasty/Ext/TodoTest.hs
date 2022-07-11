@@ -20,7 +20,7 @@ test_testCase "TODO tests appear as successful tests" = do
         [ "test_todo :: ()"
         , "test_todo \"a skipped test\" = ()"
         ]
-  stdout @?~ containsStrippedLine (eq "a skipped test: TODO")
+  getTestLines stdout @?~ containsStripped (eq "a skipped test: TODO")
 
 test_testCase :: Assertion
 test_testCase "TODO tests can wrap any type" =
@@ -40,4 +40,4 @@ test_testCase "TODO tests show compilation errors" = do
         [ "test_todo :: Assertion"
         , "test_todo \"partially implemented todo\" = length [] @?= True"
         ]
-  stderr @?~ containsStrippedLine (eq "• Couldn't match expected type ‘Int’ with actual type ‘Bool’")
+  getTestLines stderr @?~ containsStripped (eq "• Couldn't match expected type ‘Int’ with actual type ‘Bool’")

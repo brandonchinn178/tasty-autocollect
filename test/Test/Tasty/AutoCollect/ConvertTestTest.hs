@@ -123,7 +123,7 @@ test_testCase "test body can use definitions in where clause" = do
       , "  where"
       , "    constant = 42"
       ]
-  stdout @?~ containsStrippedLine (eq "a test: OK")
+  getTestLines stdout @?~ containsStripped (eq "a test: OK")
 
 test_testCase :: Assertion
 test_testCase "test arguments can be defined in where clause" = do
@@ -137,7 +137,7 @@ test_testCase "test arguments can be defined in where clause" = do
       , "constant :: Int"
       , "constant = 42"
       ]
-  stdout @?~ containsStrippedLine (eq "constant is 42: OK")
+  getTestLines stdout @?~ containsStripped (eq "constant is 42: OK")
 
 test_testCase :: Assertion
 test_testCase "test can be defined with arbitrary testers" = do
@@ -149,7 +149,7 @@ test_testCase "test can be defined with arbitrary testers" = do
       , "boolTestCase :: TestName -> Bool -> TestTree"
       , "boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
-  stdout @?~ containsStrippedLine (eq "this is a successful test: OK")
+  getTestLines stdout @?~ containsStripped (eq "this is a successful test: OK")
 
 test_testCase :: Assertion
 test_testCase "test can be defined with arbitrary testers in where clause" = do
@@ -161,7 +161,7 @@ test_testCase "test can be defined with arbitrary testers in where clause" = do
       , "    boolTestCase :: TestName -> Bool -> TestTree"
       , "    boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
-  stdout @?~ containsStrippedLine (eq "this is a successful test: OK")
+  getTestLines stdout @?~ containsStripped (eq "this is a successful test: OK")
 
 test_testCase :: Assertion
 test_testCase "testers can have any number of arguments" =
@@ -187,7 +187,7 @@ test_testCase "tests fail when omitting export comment" = do
       [ "test_testCase :: Assertion"
       , "test_testCase \"a test\" = return ()"
       ]
-  stderr @?~ containsStrippedLine (startsWith "Module ‘Test’ does not export")
+  getTestLines stderr @?~ containsStripped (startsWith "Module ‘Test’ does not export")
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test () where"
@@ -200,7 +200,7 @@ test_testCase "test file can omit an explicit export list" = do
       [ "test_testCase :: Assertion"
       , "test_testCase \"a test\" = return ()"
       ]
-  stdout @?~ containsStrippedLine (eq "a test: OK")
+  getTestLines stdout @?~ containsStripped (eq "a test: OK")
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test where"
@@ -228,7 +228,7 @@ test_testCase "test_batch generates multiple tests" = do
       , "  ]"
       ]
   forM_ [1 .. 5 :: Int] $ \x ->
-    stdout @?~ containsStrippedLine (eq . Text.pack $ printf "test #%d: OK" x)
+    getTestLines stdout @?~ containsStripped (eq . Text.pack $ printf "test #%d: OK" x)
 
 test_testCase :: Assertion
 test_testCase "test_batch includes where clause" = do
@@ -243,7 +243,7 @@ test_testCase "test_batch includes where clause" = do
       , "    label x = \"test #\" ++ show x"
       ]
   forM_ [1 .. 5 :: Int] $ \x ->
-    stdout @?~ containsStrippedLine (eq . Text.pack $ printf "test #%d: OK" x)
+    getTestLines stdout @?~ containsStripped (eq . Text.pack $ printf "test #%d: OK" x)
 
 test_testGolden :: IO Text
 test_testGolden "test_batch fails when given arguments" "test_batch_args.golden" = do
