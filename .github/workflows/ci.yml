@@ -33,8 +33,8 @@ jobs:
       - name: Build + test
         run: stack test --coverage
 
-      - name: Check that Cabal file was generated
-        run: git diff --exit-code '*.cabal'
+      - name: Check that files are unmodified
+        run: git diff --exit-code
 
       # upload coverage data
       - name: Generate coverage data
