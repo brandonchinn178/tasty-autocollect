@@ -207,6 +207,17 @@ test_testCase "test file can omit an explicit export list" = do
       | otherwise = s
 
 test_testCase :: Assertion
+test_testCase "tests can omit type signatures" = do
+  (stdout, _) <-
+    assertSuccess . runTest $
+      [ "test_testCase \"test 1\" = return ()"
+      , ""
+      , "test_testCase \"test 2\" = return ()"
+      ]
+  getTestLines stdout @?~ containsStripped (eq "test 1: OK")
+  getTestLines stdout @?~ containsStripped (eq "test 2: OK")
+
+test_testCase :: Assertion
 test_testCase "test file can contain multi-function signature" =
   assertSuccess_ . runTest $
     [ "test_testCase :: Assertion"
