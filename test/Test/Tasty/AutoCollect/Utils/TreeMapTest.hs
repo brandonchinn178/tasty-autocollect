@@ -9,8 +9,7 @@ import Test.Tasty.HUnit
 
 import Test.Tasty.AutoCollect.Utils.TreeMap
 
-test_testCase :: Assertion
-test_testCase "builds the correct tree" =
+test = testCase "builds the correct tree" $
   fromList (zip [["A", "B", "C"], ["A", "B"], ["A", "C", "D"], ["Z"]] [1 :: Int ..])
     @?= TreeMap
       { value = Nothing

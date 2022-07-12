@@ -12,32 +12,25 @@ import Test.Tasty.HUnit
 import TestUtils.Integration
 import TestUtils.Predicates
 
-test_testCase :: Assertion
-test_testCase "TODO tests appear as successful tests" = do
+test = testCase "TODO tests appear as successful tests" $ do
   (stdout, _) <-
     assertSuccess $
       runTest
-        [ "test_todo :: ()"
-        , "test_todo \"a skipped test\" = ()"
+        [ "test_todo = \"a skipped test\""
         ]
   getTestLines stdout @?~ containsStripped (eq "a skipped test: TODO")
 
-test_testCase :: Assertion
-test_testCase "TODO tests can wrap any type" =
+test = testCase "TODO tests can wrap any type" $
   assertSuccess_ $
     runTest
-      [ "test_todo :: Int"
-      , "test_todo \"todo with int\" = 1"
-      , "test_todo :: Bool"
-      , "test_todo \"todo with bool\" = True"
+      [ "test_todo = \"todo with int\""
+      , "test_todo = \"todo with bool\""
       ]
 
-test_testCase :: Assertion
-test_testCase "TODO tests show compilation errors" = do
+test = testCase "TODO tests show compilation errors" $ do
   (_, stderr) <-
     assertAnyFailure $
       runTest
-        [ "test_todo :: Assertion"
-        , "test_todo \"partially implemented todo\" = length [] @?= True"
+        [ "test_todo = \"partially implemented todo\""
         ]
   getTestLines stderr @?~ containsStripped (eq "• Couldn't match expected type ‘Int’ with actual type ‘Bool’")

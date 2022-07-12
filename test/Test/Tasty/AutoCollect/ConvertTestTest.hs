@@ -19,7 +19,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
 import Test.Predicates.HUnit
-import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Printf (printf)
 
@@ -27,16 +26,14 @@ import TestUtils.Golden
 import TestUtils.Integration
 import TestUtils.Predicates
 
-test_testCase :: Assertion
-test_testCase "plugin works without tasty installed" =
+test = testCase "plugin works without tasty installed" $
   assertSuccess_ $
     runTestWith
       ( \proj ->
           modifyFile "Test.hs" (filter (not . isTastyImport)) $
             proj{dependencies = filter (/= "tasty") (dependencies proj)}
       )
-      [ "test_testCase :: Assertion"
-      , "test_testCase \"test\" = 1 @?= 1"
+      [ "test = testCase \"test\" $ 1 @?= 1"
       ]
   where
     isTastyImport line =
@@ -50,13 +47,11 @@ test_testCase "plugin works without tasty installed" =
         -- import from `Test.Tasty.Foo` or `Test.TastyFoo`, which is ok
         _ -> False
 
-test_testCase :: Assertion
-test_testCase "plugin works without Prelude" =
+test = testCase "plugin works without Prelude" $
   assertSuccess_ $
     runTestWith
       (modifyFile "Test.hs" (const testFile))
-      [ "test_testCase :: Assertion"
-      , "test_testCase \"test\" = 1 @?= 1"
+      [ "test = testCase \"test\" $ 1 @?= 1"
       ]
   where
     testFile =
@@ -64,18 +59,15 @@ test_testCase "plugin works without Prelude" =
       , "module Test where"
       , "import Prelude ()"
       , "import Test.Tasty.HUnit"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"a test\" = 1 @?= 1"
+      , "test = testCase \"a test\" $ 1 @?= 1"
       ]
 
-test_batch :: [TestTree]
 test_batch =
   [ testCase ("plugin works when " ++ mkLabel ext) $
     assertSuccess_ $
       runTestWith
         (\proj -> proj{extraGhcArgs = maybeToList ext <> extraGhcArgs proj})
-        [ "test_testCase :: Assertion"
-        , "test_testCase \"1 = 1\" = 1 @?= 1"
+        [ "test = testCase \"1 = 1\" $ 1 @?= 1"
         ]
   | ext <-
       [ Just "-XOverloadedStrings"
@@ -88,12 +80,10 @@ test_batch =
       Nothing -> "no extensions are enabled"
       Just ext -> "enabling " <> Text.unpack ext
 
-test_batch :: [TestTree]
 test_batch =
   [ testCase ("test runs with " <> label <> " as an argument") $
     assertSuccess_ . runTest $
-      [ "test_foo :: Assertion"
-      , "test_foo " <> arg <> " = return ()"
+      [ "test = foo " <> arg <> " $ return ()"
       , ""
       , "foo :: a -> Assertion -> TestTree"
       , "foo _ = testCase \"test helper\""
@@ -119,36 +109,30 @@ test_batch =
     withExtra extraCode = fmap (\(label, arg, _) -> (label, arg, extraCode))
     onlyWhen b = if b then id else const Nothing
 
-test_batch :: [TestTree]
 test_batch =
   [ testCase "plugin propagates constructor type args correctly" $ do
     (_, stderr) <-
       assertAnyFailure . runTest $
-        [ "test_foo :: Assertion"
-        , "test_foo (Just @Int True) \"a test\" = return ()"
+        [ "test = foo (Just @Int True) \"a test\" $ return ()"
         , "  where foo = const testCase"
         ]
     stderr @?~ hasSubstr "Couldn't match expected type ‘Int’ with actual type ‘Bool’"
   | __TEST_CONSTRUCTOR_WITH_TYPE_ARGS__
   ]
 
-test_testCase :: Assertion
-test_testCase "test body can use definitions in where clause" = do
+test = testCase "generated test keeps where clause" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_testCase :: Assertion"
-      , "test_testCase \"a test\" = constant @?= 42"
+      [ "test = testCase \"a test\" $ constant @?= 42"
       , "  where"
       , "    constant = 42"
       ]
   getTestLines stdout @?~ containsStripped (eq "a test: OK")
 
-test_testCase :: Assertion
-test_testCase "test arguments can be defined in where clause" = do
+test = testCase "test arguments can be defined in where clause" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_testCase :: Assertion"
-      , "test_testCase label = constant @?= 42"
+      [ "test = testCase label $ constant @?= 42"
       , "  where"
       , "    label = \"constant is \" ++ show constant"
       , ""
@@ -157,53 +141,44 @@ test_testCase "test arguments can be defined in where clause" = do
       ]
   getTestLines stdout @?~ containsStripped (eq "constant is 42: OK")
 
-test_testCase :: Assertion
-test_testCase "test can be defined with arbitrary testers" = do
+test = testCase "test can be defined with arbitrary testers" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_boolTestCase :: Bool"
-      , "test_boolTestCase \"this is a successful test\" = 10 > 2"
+      [ "test = boolTestCase \"this is a successful test\" $ 10 > 2"
       , ""
       , "boolTestCase :: TestName -> Bool -> TestTree"
       , "boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
   getTestLines stdout @?~ containsStripped (eq "this is a successful test: OK")
 
-test_testCase :: Assertion
-test_testCase "test can be defined with arbitrary testers in where clause" = do
+test = testCase "test can be defined with arbitrary testers in where clause" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_boolTestCase :: Bool"
-      , "test_boolTestCase \"this is a successful test\" = 10 > 2"
+      [ "test = boolTestCase \"this is a successful test\" $ 10 > 2"
       , "  where"
       , "    boolTestCase :: TestName -> Bool -> TestTree"
       , "    boolTestCase name x = testCase name $ assertBool \"assertion failed\" x"
       ]
   getTestLines stdout @?~ containsStripped (eq "this is a successful test: OK")
 
-test_testCase :: Assertion
-test_testCase "testers can have any number of arguments" =
+test = testCase "testers can have any number of arguments" $
   assertSuccess_ $ runTest $ map Text.pack $ concatMap mkTest [1 .. 10]
   where
-    -- test_fooX :: Assertion
-    -- test_fooX "X args" 1 2 3 ... = return ()
+    -- test = fooX "X args" 1 2 3 ... $ return ()
     --   where
     --     fooX name _ _ _ ... = testCase name
     mkTest arity =
-      [ printf "test_foo%d :: Assertion" arity
-      , printf "test_foo%d \"%d args\" %s = return ()" arity arity (mkArgs arity)
+      [ printf "test = foo%d \"%d args\" %s $ return ()" arity arity (mkArgs arity)
       , printf "  where"
       , printf "    foo%d name %s = testCase name" arity (mkPatterns arity)
       ]
     mkArgs arity = concatMap (\x -> show x <> " ") [1 .. arity]
     mkPatterns arity = concat $ replicate arity "_ "
 
-test_testCase :: Assertion
-test_testCase "tests fail when omitting export comment" = do
+test = testCase "tests fail when omitting export comment" $ do
   (_, stderr) <-
     assertAnyFailure . runTestWith (modifyFile "Test.hs" (map removeExports)) $
-      [ "test_testCase :: Assertion"
-      , "test_testCase \"a test\" = return ()"
+      [ "test = testCase \"a test\" $ return ()"
       ]
   getTestLines stderr @?~ containsStripped (startsWith "Module ‘Test’ does not export")
   where
@@ -211,12 +186,10 @@ test_testCase "tests fail when omitting export comment" = do
       | "module " `Text.isPrefixOf` s = "module Test () where"
       | otherwise = s
 
-test_testCase :: Assertion
-test_testCase "test file can omit an explicit export list" = do
+test = testCase "test file can omit an explicit export list" $ do
   (stdout, _) <-
     assertSuccess . runTestWith (modifyFile "Test.hs" (map removeExports)) $
-      [ "test_testCase :: Assertion"
-      , "test_testCase \"a test\" = return ()"
+      [ "test = testCase \"a test\" $ return ()"
       ]
   getTestLines stdout @?~ containsStripped (eq "a test: OK")
   where
@@ -224,34 +197,29 @@ test_testCase "test file can omit an explicit export list" = do
       | "module " `Text.isPrefixOf` s = "module Test where"
       | otherwise = s
 
-test_testCase :: Assertion
-test_testCase "tests can omit type signatures" = do
+test = testCase "tests can omit type signatures" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_testCase \"test 1\" = return ()"
+      [ "test = testCase \"test 1\" $ return ()"
       , ""
-      , "test_testCase \"test 2\" = return ()"
+      , "test = testCase \"test 2\" $ return ()"
       ]
   getTestLines stdout @?~ containsStripped (eq "test 1: OK")
   getTestLines stdout @?~ containsStripped (eq "test 2: OK")
 
-test_testCase :: Assertion
-test_testCase "test file can contain multi-function signature" =
+test = testCase "test file can contain multi-function signature" $
   assertSuccess_ . runTest $
-    [ "test_testCase :: Assertion"
-    , "test_testCase \"test\" = timesTen 1 @?= timesFive 2"
+    [ "test = testCase \"test\" $ timesTen 1 @?= timesFive 2"
     , ""
     , "timesTen, timesFive :: Int -> Int"
     , "timesTen = (* 10)"
     , "timesFive = (* 5)"
     ]
 
-test_testCase :: Assertion
-test_testCase "test_batch generates multiple tests" = do
+test = testCase "test_batch generates multiple tests" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_batch :: [TestTree]"
-      , "test_batch ="
+      [ "test_batch ="
       , "  [ testCase (\"test #\" ++ show x) $ return ()"
       , "  | x <- [1 .. 5]"
       , "  ]"
@@ -259,12 +227,10 @@ test_testCase "test_batch generates multiple tests" = do
   forM_ [1 .. 5 :: Int] $ \x ->
     getTestLines stdout @?~ containsStripped (eq . Text.pack $ printf "test #%d: OK" x)
 
-test_testCase :: Assertion
-test_testCase "test_batch includes where clause" = do
+test = testCase "test_batch includes where clause" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test_batch :: [TestTree]"
-      , "test_batch ="
+      [ "test_batch ="
       , "  [ testCase (label x) $ return ()"
       , "  | x <- [1 .. 5]"
       , "  ]"
@@ -274,17 +240,14 @@ test_testCase "test_batch includes where clause" = do
   forM_ [1 .. 5 :: Int] $ \x ->
     getTestLines stdout @?~ containsStripped (eq . Text.pack $ printf "test #%d: OK" x)
 
-test_testGolden :: IO Text
-test_testGolden "test_batch fails when given arguments" "test_batch_args.golden" = do
+test = testGolden "test_batch fails when given arguments" "test_batch_args.golden" $ do
   (_, stderr) <-
     assertAnyFailure . runTest $
-      [ "test_batch :: [TestTree]"
-      , "test_batch \"some name\" = []"
+      [ "test_batch \"some name\" = []"
       ]
   return stderr
 
-test_testGolden :: IO Text
-test_testGolden "test_batch fails when specifying wrong type" "test_batch_type.golden" = do
+test = testGolden "test_batch fails when specifying wrong type" "test_batch_type.golden" $ do
   (_, stderr) <-
     assertAnyFailure . runTest $
       [ "test_batch :: Int"
