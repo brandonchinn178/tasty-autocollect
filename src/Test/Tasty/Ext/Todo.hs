@@ -46,5 +46,5 @@ instance IsOption FailTodos where
   optionCLParser = flagCLParser Nothing (FailTodos True)
 
 -- | A TestTree representing a test that will be written at some point.
-testTreeTodo :: TestName -> a -> TestTree
-testTreeTodo name _ = SingleTest name TodoTest
+testTreeTodo :: TestName -> TestTree
+testTreeTodo name = SingleTest name TodoTest

@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           tasty-autocollect
-version:        0.1.0.0
+version:        0.2.0.0
 synopsis:       Autocollection of tasty tests.
 description:    Autocollection of tasty tests. See README.md for more details.
 category:       Testing
@@ -20,11 +20,18 @@ extra-source-files:
     README.md
     CHANGELOG.md
     test/golden/example.golden
+    test/golden/fail_todos.golden
     test/golden/output_group_type_flat.golden
     test/golden/output_group_type_modules.golden
     test/golden/output_group_type_tree.golden
+    test/golden/test_args.golden
     test/golden/test_batch_args.golden
     test/golden/test_batch_type.golden
+    test/golden/test_prop_bad_arg.golden
+    test/golden/test_prop_no_args.golden
+    test/golden/test_todo_args.golden
+    test/golden/test_todo_type.golden
+    test/golden/test_type.golden
 
 source-repository head
   type: git

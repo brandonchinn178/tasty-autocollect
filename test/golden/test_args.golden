@@ -1,4 +1,4 @@
 
 ******************** tasty-autocollect failure ********************
-test_batch should not be used with arguments (at line 5)
+test should not be used with arguments (at line 5)
 

@@ -31,9 +31,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_2 (
   parseSigWcType,
   parseType,
 
-  -- ** Pat
-  parsePat,
-
   -- ** Expr
   mkExplicitList,
   mkExplicitTuple,
@@ -43,7 +40,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_2 (
 -- Re-exports
 import GHC.Driver.Main as X (getHscEnv)
 import GHC.Hs as X hiding (comment, mkHsAppType, mkHsAppTypes)
-import GHC.Plugins as X hiding (AnnBind (..), AnnExpr' (..), getHscEnv, srcSpanStart, varName)
+import GHC.Plugins as X hiding (AnnBind (..), AnnExpr' (..), getHscEnv, showPpr, srcSpanStart, varName)
 import GHC.Types.Name.Cache as X (NameCache)
 
 import qualified Data.Text as Text
@@ -135,38 +132,6 @@ parseType (L _ ty) =
     HsTyVar _ flag name -> Just $ TypeVar flag name
     HsListTy _ t -> TypeList <$> parseType t
     _ -> Nothing
-
-{----- Compat / Pat -----}
-
-parsePat :: LPat GhcPs -> ParsedPat
-parsePat (L _ pat) =
-  case pat of
-    WildPat{} -> PatWildCard
-    VarPat _ name -> PatVar name
-    LazyPat{} -> PatLazy
-    AsPat{} -> PatAs
-    ParPat _ p -> PatParens (parsePat p)
-    BangPat{} -> PatBang
-    ListPat _ ps -> PatList (map parsePat ps)
-    TuplePat _ ps boxity -> PatTuple (map parsePat ps) boxity
-    SumPat{} -> PatSum
-    ConPat _ name details ->
-      PatConstructor name $
-        case details of
-          PrefixCon tyargs args -> ConstructorPrefix (map hsps_body tyargs) (map parsePat args)
-          RecCon HsRecFields{..} ->
-            ConstructorRecord
-              HsRecFields
-                { rec_flds = (fmap . fmap . fmap) parsePat rec_flds
-                , ..
-                }
-          InfixCon l r -> ConstructorInfix (parsePat l) (parsePat r)
-    ViewPat{} -> PatView
-    SplicePat _ splice -> PatSplice splice
-    LitPat _ lit -> PatLiteral lit
-    NPat _ lit _ _ -> PatOverloadedLit lit
-    NPlusKPat{} -> PatNPlusK
-    SigPat _ p (HsPS _ ty) -> PatTypeSig (parsePat p) ty
 
 {----- Compat / Expr -----}
 

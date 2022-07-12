@@ -1,4 +1,6 @@
 
 ******************** tasty-autocollect failure ********************
-test_batch needs to be set to a [TestTree]
+Expected type: [TestTree]
+Got: TestTree
+
 

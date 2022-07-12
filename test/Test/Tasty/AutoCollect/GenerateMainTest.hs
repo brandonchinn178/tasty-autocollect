@@ -9,19 +9,18 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
 import Test.Predicates.HUnit
-import Test.Tasty (TestTree)
 import Test.Tasty.HUnit
 
 import TestUtils.Golden
 import TestUtils.Integration
 import TestUtils.Predicates
 
-test_testCase :: Assertion
-test_testCase "allows omitting all configuration" =
-  assertSuccess_ $ runMain ["{- AUTOCOLLECT.MAIN -}"]
+test =
+  testCase "allows omitting all configuration" $
+    assertSuccess_ $
+      runMain ["{- AUTOCOLLECT.MAIN -}"]
 
-test_testCase :: Assertion
-test_testCase "searches recursively" = do
+test = testCase "searches recursively" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (addFiles [("A/B/C/X/Y/Z.hs", testFile)]) $
       [ "{- AUTOCOLLECT.MAIN"
@@ -34,11 +33,9 @@ test_testCase "searches recursively" = do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module A.B.C.X.Y.Z where"
       , "import Test.Tasty.HUnit"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"test\" = return ()"
+      , "test = testCase \"test\" $ return ()"
       ]
 
-test_batch :: [TestTree]
 test_batch =
   [ testGolden
     ("output for group_type = " <> groupType <> " is as expected")
@@ -64,16 +61,11 @@ test_batch =
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"test #1 for " <> ident <> "\" = return ()"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"test #2 for " <> ident <> "\" = return ()"
+      , "test = testCase \"test #1 for " <> ident <> "\" $ return ()"
+      , "test = testCase \"test #2 for " <> ident <> "\" $ return ()"
       ]
 
--- test_batch "Golden test on stdout of generateMain for each group type" = ()
-
-test_testCase :: Assertion
-test_testCase "generateMain orders test modules alphabetically" = do
+test = testCase "generateMain orders test modules alphabetically" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (setTestFiles testFiles) $
       [ "{- AUTOCOLLECT.MAIN"
@@ -106,12 +98,10 @@ test_testCase "generateMain orders test modules alphabetically" = do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"test\" = return ()"
+      , "test = testCase \"test\" $ return ()"
       ]
 
-test_testCase :: Assertion
-test_testCase "allows stripping suffix from test modules" = do
+test = testCase "allows stripping suffix from test modules" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (setTestFiles testFiles) $
       [ "{- AUTOCOLLECT.MAIN"
@@ -136,12 +126,10 @@ test_testCase "allows stripping suffix from test modules" = do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test_testCase :: Assertion"
-      , "test_testCase \"test\" = return ()"
+      , "test = testCase \"test\" $ return ()"
       ]
 
-test_testCase :: Assertion
-test_testCase "suffix is stripped before building module tree" = do
+test = testCase "suffix is stripped before building module tree" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (setTestFiles testFiles) $
       [ "{- AUTOCOLLECT.MAIN"
@@ -167,8 +155,7 @@ test_testCase "suffix is stripped before building module tree" = do
           [ "{- AUTOCOLLECT.TEST -}"
           , "module A.B.CTest where"
           , "import Test.Tasty.HUnit"
-          , "test_testCase :: Assertion"
-          , "test_testCase \"test1\" = return ()"
+          , "test = testCase \"test1\" $ return ()"
           ]
         )
       ,
@@ -177,14 +164,12 @@ test_testCase "suffix is stripped before building module tree" = do
           [ "{- AUTOCOLLECT.TEST -}"
           , "module A.B.C.DTest where"
           , "import Test.Tasty.HUnit"
-          , "test_testCase :: Assertion"
-          , "test_testCase \"test2\" = return ()"
+          , "test = testCase \"test2\" $ return ()"
           ]
         )
       ]
 
-test_testCase :: Assertion
-test_testCase "allows adding extra ingredients" = do
+test = testCase "allows adding extra ingredients" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (addFiles [("MyIngredient.hs", ingredientFile)]) $
       [ "{- AUTOCOLLECT.MAIN"
@@ -201,8 +186,7 @@ test_testCase "allows adding extra ingredients" = do
       , "  putStrLn \"Hello!\" >> return True"
       ]
 
-test_testCase :: Assertion
-test_testCase "gives informative error when ingredient lacks module" = do
+test = testCase "gives informative error when ingredient lacks module" $ do
   (_, stderr) <-
     assertAnyFailure . runMain $
       [ "{- AUTOCOLLECT.MAIN"
@@ -211,8 +195,7 @@ test_testCase "gives informative error when ingredient lacks module" = do
       ]
   getTestLines stderr @?~ contains (eq "Ingredient needs to be fully qualified: myIngredient")
 
-test_testCase :: Assertion
-test_testCase "allows disabling default tasty ingredients" = do
+test = testCase "allows disabling default tasty ingredients" $ do
   (_, stderr) <-
     assertAnyFailure . runMain $
       [ "{- AUTOCOLLECT.MAIN"
@@ -221,8 +204,7 @@ test_testCase "allows disabling default tasty ingredients" = do
       ]
   stderr @?~ startsWith "No ingredients agreed to run."
 
-test_testCase :: Assertion
-test_testCase "allows overriding suite name" = do
+test = testCase "allows overriding suite name" $ do
   (stdout, _) <-
     assertSuccess . runMain $
       [ "{- AUTOCOLLECT.MAIN"
@@ -265,7 +247,6 @@ runMainWith f mainFile =
         , "import Test.Tasty"
         , "import Test.Tasty.HUnit"
         , ""
-        , "test_testCase :: Assertion"
-        , "test_testCase \"a test in " <> moduleName <> "\" = return ()"
+        , "test = testCase \"a test in " <> moduleName <> "\" $ return ()"
         ]
       )

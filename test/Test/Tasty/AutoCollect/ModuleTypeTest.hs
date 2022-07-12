@@ -17,26 +17,24 @@ import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.ModuleType
 import TestUtils.QuickCheck
 
-test_testCase :: Assertion
-test_testCase "parseModuleType finds first comment" = do
+test = testCase "parseModuleType finds first comment" $ do
   parseModuleType (Text.unlines [test, main]) @?= Just ModuleTest
   parseModuleType (Text.unlines [main, test]) @?~ just ($(qADT 'ModuleMain) anything)
   where
     main = "{- AUTOCOLLECT.MAIN -}"
     test = "{- AUTOCOLLECT.TEST -}"
 
-test_testProperty :: Property
-test_testProperty "parseModuleType parses MAIN case-insensitive" =
+test_prop :: Property
+test_prop "parseModuleType parses MAIN case-insensitive" =
   forAll (genMixedCase "{- AUTOCOLLECT.MAIN -}") $ \main ->
     parseModuleType main `satisfies` just ($(qADT 'ModuleMain) anything)
 
-test_testProperty :: Property
-test_testProperty "parseModuleType parses TEST case-insensitive" =
+test_prop :: Property
+test_prop "parseModuleType parses TEST case-insensitive" =
   forAll (genMixedCase "{- AUTOCOLLECT.TEST -}") $ \test ->
     parseModuleType test === Just ModuleTest
 
-test_testCase :: Assertion
-test_testCase "parseModuleType parses configuration for main modules" = do
+test = testCase "parseModuleType parses configuration for main modules" $ do
   parseModuleType "{- AUTOCOLLECT.MAIN suite_name = foo -}"
     @?~ just ($(qADT 'ModuleMain) $ cfgSuiteName `with` eq (Just "foo"))
   parseModuleType "{- AUTOCOLLECT.MAIN\nsuite_name = foo\n-}"
