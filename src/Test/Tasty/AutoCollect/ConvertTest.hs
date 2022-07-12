@@ -6,7 +6,7 @@ module Test.Tasty.AutoCollect.ConvertTest (
   plugin,
 ) where
 
-import Control.Monad (unless)
+import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
@@ -121,11 +121,11 @@ convertTest names ldecl =
     Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType (fromRdrName funcName) -> do
           mSigInfo <- getLastSeenSig
-          concatMapM (convertSingleTest funcName testType mSigInfo . unLoc) funcDefs
+          concat <$> zipWithM (convertSingleTest funcName testType) (mSigInfo : repeat Nothing) funcDefs
     -- anything else leave unmodified
     _ -> pure [ldecl]
   where
-    convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
+    convertSingleTest funcName testType mSigInfo (L _ FuncSingleDef{..}) = do
       (testName, mSigType) <-
         case mSigInfo of
           Nothing -> do

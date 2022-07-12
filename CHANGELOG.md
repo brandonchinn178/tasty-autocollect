@@ -1,5 +1,7 @@
 # Unreleased
 
+* Fix bug when omitting signature after specifying a signature for a prior test
+
 # v0.2.0.0
 
 * Fix build for GHC 8.10.2
