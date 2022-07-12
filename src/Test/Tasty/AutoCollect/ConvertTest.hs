@@ -10,6 +10,7 @@ import Control.Monad (unless)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
+import Data.Maybe (isNothing)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 
@@ -125,13 +126,13 @@ convertTest names ldecl =
     _ -> pure [ldecl]
   where
     convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
-      (testName, mSigType, needsFuncSig) <-
+      (testName, mSigType) <-
         case mSigInfo of
           Nothing -> do
             testName <- getNextTestName
-            pure (testName, Nothing, True)
+            pure (testName, Nothing)
           Just SigInfo{testType = testTypeFromSig, ..}
-            | testType == testTypeFromSig -> pure (testName, Just signatureType, False)
+            | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
       funcBody <-
@@ -176,7 +177,7 @@ convertTest names ldecl =
             pure funcBody
 
       pure . concat $
-        [ if needsFuncSig
+        [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
