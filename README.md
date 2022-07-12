@@ -58,6 +58,8 @@ Design goals:
         1 + 1 @?= (2 :: Int)
         2 + 2 @?= (4 :: Int)
 
+    -- See the "Integration with QuickCheck/SmallCheck/etc." section
+    -- for a more seamless integration
     test =
       testProperty "reverse . reverse === id" $ \xs ->
         (reverse . reverse) xs === id (xs :: [Int])
