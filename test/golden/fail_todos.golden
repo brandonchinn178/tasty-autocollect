@@ -1,0 +1,6 @@
+Main.hs
+  Test
+    a pending test: TODO
+      Failing because --fail-todos was set
+
+1 out of 1 tests failed

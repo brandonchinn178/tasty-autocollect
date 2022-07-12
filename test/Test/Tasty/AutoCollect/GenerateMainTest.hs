@@ -65,8 +65,6 @@ test_batch =
       , "test = testCase \"test #2 for " <> ident <> "\" $ return ()"
       ]
 
--- test_batch "Golden test on stdout of generateMain for each group type" = ()
-
 test = testCase "generateMain orders test modules alphabetically" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (setTestFiles testFiles) $
