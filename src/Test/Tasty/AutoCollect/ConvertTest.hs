@@ -120,22 +120,26 @@ convertTest names ldecl =
     -- =>   test1 = [testCase "test name" (<body> :: Assertion)]
     Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType funcName -> do
-          (testName, funcBodyType) <-
-            getLastSeenSig >>= \case
-              Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{testType = testTypeFromSig, ..}
-                | testType == testTypeFromSig -> pure (testName, testHsType)
-                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
+          mSigInfo <- getLastSeenSig
 
-          FuncSingleDef{..} <-
             case funcDefs of
               [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
-              [funcDef] -> pure $ unLoc funcDef
+              [funcDef] -> convertSingleTest funcName testType mSigInfo (unLoc funcDef)
               _ ->
                 autocollectError . unlines $
                   [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
                   , "Did you forget to add a type annotation for a test?"
                   ]
+    -- anything else leave unmodified
+    _ -> pure [ldecl]
+  where
+    convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
+          (testName, funcBodyType) <-
+            case mSigInfo of
+              Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
+              Just SigInfo{testType = testTypeFromSig, ..}
+                | testType == testTypeFromSig -> pure (testName, testHsType)
+                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
           funcBody <-
             case funcDefGuards of
@@ -161,8 +165,6 @@ convertTest names ldecl =
                     | otherwise -> funcBodyWithType
 
           pure [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
-    -- anything else leave unmodified
-    _ -> pure [ldecl]
 
 {- |
 Convert the given pattern to the expression that it would represent
