@@ -50,6 +50,24 @@ test_testCase "plugin works without tasty installed" =
         -- import from `Test.Tasty.Foo` or `Test.TastyFoo`, which is ok
         _ -> False
 
+test_testCase :: Assertion
+test_testCase "plugin works without Prelude" =
+  assertSuccess_ $
+    runTestWith
+      (modifyFile "Test.hs" (const testFile))
+      [ "test_testCase :: Assertion"
+      , "test_testCase \"test\" = 1 @?= 1"
+      ]
+  where
+    testFile =
+      [ "{- AUTOCOLLECT.TEST -}"
+      , "module Test where"
+      , "import Prelude ()"
+      , "import Test.Tasty.HUnit"
+      , "test_testCase :: Assertion"
+      , "test_testCase \"a test\" = 1 @?= 1"
+      ]
+
 test_batch :: [TestTree]
 test_batch =
   [ testCase ("plugin works when " ++ mkLabel ext) $

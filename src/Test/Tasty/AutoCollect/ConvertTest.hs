@@ -92,7 +92,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
           ]
 
     flattenTestList testsList =
-      mkHsApp (lhsvar $ mkLRdrName "concat") $
+      mkHsApp (lhsvar $ genLoc $ getRdrName $ name_concat names) $
         genLoc . ExprWithTySig noAnn testsList $
           HsWC NoExtField . hsTypeToHsSigType . genLoc $
             HsListTy noAnn (getListOfTestTreeType names)
