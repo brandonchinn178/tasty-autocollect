@@ -122,49 +122,49 @@ convertTest names ldecl =
       | Just testType <- parseTestType funcName -> do
           mSigInfo <- getLastSeenSig
 
-            case funcDefs of
-              [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
-              [funcDef] -> convertSingleTest funcName testType mSigInfo (unLoc funcDef)
-              _ ->
-                autocollectError . unlines $
-                  [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
-                  , "Did you forget to add a type annotation for a test?"
-                  ]
+          case funcDefs of
+            [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
+            [funcDef] -> convertSingleTest funcName testType mSigInfo (unLoc funcDef)
+            _ ->
+              autocollectError . unlines $
+                [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
+                , "Did you forget to add a type annotation for a test?"
+                ]
     -- anything else leave unmodified
     _ -> pure [ldecl]
   where
     convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
-          (testName, funcBodyType) <-
-            case mSigInfo of
-              Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{testType = testTypeFromSig, ..}
-                | testType == testTypeFromSig -> pure (testName, testHsType)
-                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
+      (testName, funcBodyType) <-
+        case mSigInfo of
+          Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
+          Just SigInfo{testType = testTypeFromSig, ..}
+            | testType == testTypeFromSig -> pure (testName, testHsType)
+            | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-          funcBody <-
-            case funcDefGuards of
-              [FuncGuardedBody [] body] -> pure body
-              _ ->
-                autocollectError . unlines $
-                  [ "Test should have no guards."
-                  , "Found guards at " ++ getSpanLine funcName
+      funcBody <-
+        case funcDefGuards of
+          [FuncGuardedBody [] body] -> pure body
+          _ ->
+            autocollectError . unlines $
+              [ "Test should have no guards."
+              , "Found guards at " ++ getSpanLine funcName
+              ]
+
+      -- tester (...funcArgs) (funcBody :: funcBodyType)
+      let funcBodyWithType = genLoc $ ExprWithTySig noAnn funcBody funcBodyType
+          testBody =
+            case testType of
+              TestSingle tester ->
+                genLoc . mkExplicitList $
+                  [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
+                      map patternToExpr funcDefArgs ++ [funcBodyWithType]
                   ]
+              TestBatch
+                | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
+                | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
+                | otherwise -> funcBodyWithType
 
-          -- tester (...funcArgs) (funcBody :: funcBodyType)
-          let funcBodyWithType = genLoc $ ExprWithTySig noAnn funcBody funcBodyType
-              testBody =
-                case testType of
-                  TestSingle tester ->
-                    genLoc . mkExplicitList $
-                      [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
-                          map patternToExpr funcDefArgs ++ [funcBodyWithType]
-                      ]
-                  TestBatch
-                    | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
-                    | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
-                    | otherwise -> funcBodyWithType
-
-          pure [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+      pure [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
 
 {- |
 Convert the given pattern to the expression that it would represent
