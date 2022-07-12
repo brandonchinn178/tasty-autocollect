@@ -24,11 +24,13 @@ import TestUtils.QuickCheck
 
 {----- Configuration syntax -----}
 
-test = testCase "parseConfig ignores comments" $
-  parseConfig "# this is a comment" @?~ right anything
+test =
+  testCase "parseConfig ignores comments" $
+    parseConfig "# this is a comment" @?~ right anything
 
-test = testCase "parseConfig ignores empty lines" $
-  parseConfig "\n\n\n" @?~ right anything
+test =
+  testCase "parseConfig ignores empty lines" $
+    parseConfig "\n\n\n" @?~ right anything
 
 test = testProperty "parseConfig errors on ill-formed lines" $
   forAll (invalidLine `suchThat` (not . isIgnored)) $ \line ->

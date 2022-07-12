@@ -26,15 +26,16 @@ import TestUtils.Golden
 import TestUtils.Integration
 import TestUtils.Predicates
 
-test = testCase "plugin works without tasty installed" $
-  assertSuccess_ $
-    runTestWith
-      ( \proj ->
-          modifyFile "Test.hs" (filter (not . isTastyImport)) $
-            proj{dependencies = filter (/= "tasty") (dependencies proj)}
-      )
-      [ "test = testCase \"test\" $ 1 @?= 1"
-      ]
+test =
+  testCase "plugin works without tasty installed" $
+    assertSuccess_ $
+      runTestWith
+        ( \proj ->
+            modifyFile "Test.hs" (filter (not . isTastyImport)) $
+              proj{dependencies = filter (/= "tasty") (dependencies proj)}
+        )
+        [ "test = testCase \"test\" $ 1 @?= 1"
+        ]
   where
     isTastyImport line =
       case Text.unpack <$> Text.stripPrefix "import Test.Tasty" line of
@@ -47,12 +48,13 @@ test = testCase "plugin works without tasty installed" $
         -- import from `Test.Tasty.Foo` or `Test.TastyFoo`, which is ok
         _ -> False
 
-test = testCase "plugin works without Prelude" $
-  assertSuccess_ $
-    runTestWith
-      (modifyFile "Test.hs" (const testFile))
-      [ "test = testCase \"test\" $ 1 @?= 1"
-      ]
+test =
+  testCase "plugin works without Prelude" $
+    assertSuccess_ $
+      runTestWith
+        (modifyFile "Test.hs" (const testFile))
+        [ "test = testCase \"test\" $ 1 @?= 1"
+        ]
   where
     testFile =
       [ "{- AUTOCOLLECT.TEST -}"
@@ -161,8 +163,12 @@ test = testCase "test can be defined with arbitrary testers in where clause" $ d
       ]
   getTestLines stdout @?~ containsStripped (eq "this is a successful test: OK")
 
-test = testCase "testers can have any number of arguments" $
-  assertSuccess_ $ runTest $ map Text.pack $ concatMap mkTest [1 .. 10]
+test =
+  testCase "testers can have any number of arguments" $
+    assertSuccess_ $
+      runTest $
+        map Text.pack $
+          concatMap mkTest [1 .. 10]
   where
     -- test = fooX "X args" 1 2 3 ... $ return ()
     --   where
@@ -207,14 +213,15 @@ test = testCase "tests can omit type signatures" $ do
   getTestLines stdout @?~ containsStripped (eq "test 1: OK")
   getTestLines stdout @?~ containsStripped (eq "test 2: OK")
 
-test = testCase "test file can contain multi-function signature" $
-  assertSuccess_ . runTest $
-    [ "test = testCase \"test\" $ timesTen 1 @?= timesFive 2"
-    , ""
-    , "timesTen, timesFive :: Int -> Int"
-    , "timesTen = (* 10)"
-    , "timesFive = (* 5)"
-    ]
+test =
+  testCase "test file can contain multi-function signature" $
+    assertSuccess_ . runTest $
+      [ "test = testCase \"test\" $ timesTen 1 @?= timesFive 2"
+      , ""
+      , "timesTen, timesFive :: Int -> Int"
+      , "timesTen = (* 10)"
+      , "timesFive = (* 5)"
+      ]
 
 test = testCase "test_batch generates multiple tests" $ do
   (stdout, _) <-

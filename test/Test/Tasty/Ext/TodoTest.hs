@@ -20,12 +20,13 @@ test = testCase "TODO tests appear as successful tests" $ do
         ]
   getTestLines stdout @?~ containsStripped (eq "a skipped test: TODO")
 
-test = testCase "TODO tests can wrap any type" $
-  assertSuccess_ $
-    runTest
-      [ "test_todo = \"todo with int\""
-      , "test_todo = \"todo with bool\""
-      ]
+test =
+  testCase "TODO tests can wrap any type" $
+    assertSuccess_ $
+      runTest
+        [ "test_todo = \"todo with int\""
+        , "test_todo = \"todo with bool\""
+        ]
 
 test = testCase "TODO tests show compilation errors" $ do
   (_, stderr) <-

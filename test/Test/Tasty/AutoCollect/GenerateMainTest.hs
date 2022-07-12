@@ -15,8 +15,10 @@ import TestUtils.Golden
 import TestUtils.Integration
 import TestUtils.Predicates
 
-test = testCase "allows omitting all configuration" $
-  assertSuccess_ $ runMain ["{- AUTOCOLLECT.MAIN -}"]
+test =
+  testCase "allows omitting all configuration" $
+    assertSuccess_ $
+      runMain ["{- AUTOCOLLECT.MAIN -}"]
 
 test = testCase "searches recursively" $ do
   (stdout, _) <-
