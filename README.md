@@ -25,6 +25,9 @@ Design goals:
         build-tools:
           - tasty-autocollect:tasty-autocollect
         ...
+        dependencies:
+          - tasty-autocollect
+          - ...
     ```
     ```cabal
     test-suite my-library-tests
@@ -32,6 +35,9 @@ Design goals:
       build-tool-depends:
         tasty-autocollect:tasty-autocollect
       ...
+      build-depends:
+        tasty-autocollect
+        ...
     ```
 
 1. Write your main file to contain just:
