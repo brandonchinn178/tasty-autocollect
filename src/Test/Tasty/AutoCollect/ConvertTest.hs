@@ -6,10 +6,11 @@ module Test.Tasty.AutoCollect.ConvertTest (
   plugin,
 ) where
 
-import Control.Monad (unless)
+import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
+import Data.Maybe (isNothing)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 
@@ -120,18 +121,18 @@ convertTest names ldecl =
     Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType (fromRdrName funcName) -> do
           mSigInfo <- getLastSeenSig
-          concatMapM (convertSingleTest funcName testType mSigInfo . unLoc) funcDefs
+          concat <$> zipWithM (convertSingleTest funcName testType) (mSigInfo : repeat Nothing) funcDefs
     -- anything else leave unmodified
     _ -> pure [ldecl]
   where
-    convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
-      (testName, mSigType, needsFuncSig) <-
+    convertSingleTest funcName testType mSigInfo (L _ FuncSingleDef{..}) = do
+      (testName, mSigType) <-
         case mSigInfo of
           Nothing -> do
             testName <- getNextTestName
-            pure (testName, Nothing, True)
+            pure (testName, Nothing)
           Just SigInfo{testType = testTypeFromSig, ..}
-            | testType == testTypeFromSig -> pure (testName, Just signatureType, False)
+            | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
       funcBody <-
@@ -176,7 +177,7 @@ convertTest names ldecl =
             pure funcBody
 
       pure . concat $
-        [ if needsFuncSig
+        [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]

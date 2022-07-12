@@ -153,6 +153,15 @@ test = testCase "tests can omit type signatures" $ do
   getTestLines stdout @?~ containsStripped (eq "test 1: OK")
   getTestLines stdout @?~ containsStripped (eq "test 2: OK")
 
+test =
+  testCase "tests may omit type after specifying a type prior" $
+    assertSuccess_ . runQCTest $
+      [ "test :: TestTree"
+      , "test = testCase \"test 1\" $ return ()"
+      , ""
+      , "test = testCase \"test 2\" $ return ()"
+      ]
+
 {----- test_batch -----}
 
 test = testCase "test_batch generates multiple tests" $ do
@@ -217,6 +226,15 @@ test =
   testCase "test_prop may omit type" $
     assertSuccess_ . runQCTest $
       [ "test_prop \"test\" x = (x :: Int) === x"
+      ]
+
+test =
+  testCase "test_prop may omit type after specifying a different type prior" $
+    assertSuccess_ . runQCTest $
+      [ "test_prop :: Property"
+      , "test_prop \"test 1\" = 1 === 1"
+      , ""
+      , "test_prop \"test 2\" x = (x :: Int) === x"
       ]
 
 test =

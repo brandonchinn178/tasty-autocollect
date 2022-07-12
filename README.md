@@ -25,6 +25,9 @@ Design goals:
         build-tools:
           - tasty-autocollect:tasty-autocollect
         ...
+        dependencies:
+          - tasty-autocollect
+          - ...
     ```
     ```cabal
     test-suite my-library-tests
@@ -32,6 +35,9 @@ Design goals:
       build-tool-depends:
         tasty-autocollect:tasty-autocollect
       ...
+      build-depends:
+        tasty-autocollect
+        ...
     ```
 
 1. Write your main file to contain just:
@@ -58,6 +64,8 @@ Design goals:
         1 + 1 @?= (2 :: Int)
         2 + 2 @?= (4 :: Int)
 
+    -- See the "Integration with QuickCheck/SmallCheck/etc." section
+    -- for a more seamless integration
     test =
       testProperty "reverse . reverse === id" $ \xs ->
         (reverse . reverse) xs === id (xs :: [Int])
