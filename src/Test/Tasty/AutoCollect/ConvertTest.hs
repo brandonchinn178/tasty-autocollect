@@ -9,7 +9,7 @@ module Test.Tasty.AutoCollect.ConvertTest (
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
-import Data.List (intercalate, stripPrefix)
+import Data.List (stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 
@@ -65,7 +65,7 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ mapM (convertTest names) $ hsmodDecls modl
+      let (decls, testNames) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
             , hsmodDecls = mkTestsList testNames ++ decls
@@ -101,9 +101,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 If the given declaration is a test, return the converted test, or otherwise
 return it unmodified
 -}
-convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
-convertTest names loc =
-  case parseDecl loc of
+convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
+convertTest names ldecl =
+  case parseDecl ldecl of
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: [TestTree]
     Just (FuncSig [funcName] ty)
@@ -115,54 +115,55 @@ convertTest names loc =
               , testName
               , testHsType = ty
               }
-          pure (genFuncSig testName (getListOfTestTreeType names) <$ loc)
+          pure [genFuncSig testName (getListOfTestTreeType names) <$ ldecl]
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = [testCase "test name" (<body> :: Assertion)]
     Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType funcName -> do
-          (testName, funcBodyType) <-
-            getLastSeenSig >>= \case
-              Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
-              Just SigInfo{testType = testTypeFromSig, ..}
-                | testType == testTypeFromSig -> pure (testName, testHsType)
-                | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
-
-          FuncSingleDef{..} <-
-            case funcDefs of
-              [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
-              [funcDef] -> pure $ unLoc funcDef
-              _ ->
-                autocollectError . unlines $
-                  [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
-                  , "Did you forget to add a type annotation for a test?"
-                  ]
-
-          funcBody <-
-            case funcDefGuards of
-              [FuncGuardedBody [] body] -> pure body
-              _ ->
-                autocollectError . unlines $
-                  [ "Test should have no guards."
-                  , "Found guards at " ++ getSpanLine funcName
-                  ]
-
-          -- tester (...funcArgs) (funcBody :: funcBodyType)
-          let funcBodyWithType = genLoc $ ExprWithTySig noAnn funcBody funcBodyType
-              testBody =
-                case testType of
-                  TestSingle tester ->
-                    genLoc . mkExplicitList $
-                      [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
-                          map patternToExpr funcDefArgs ++ [funcBodyWithType]
-                      ]
-                  TestBatch
-                    | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
-                    | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
-                    | otherwise -> funcBodyWithType
-
-          pure (genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ loc)
+          mSigInfo <- getLastSeenSig
+          concatMapM (convertSingleTest funcName testType mSigInfo . unLoc) funcDefs
     -- anything else leave unmodified
-    _ -> pure loc
+    _ -> pure [ldecl]
+  where
+    convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
+      (testName, mFuncBodyType, needsFuncSig) <-
+        case mSigInfo of
+          Nothing -> do
+            testName <- getNextTestName
+            pure (testName, Nothing, True)
+          Just SigInfo{testType = testTypeFromSig, ..}
+            | testType == testTypeFromSig -> pure (testName, Just testHsType, False)
+            | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
+
+      funcBody <-
+        case funcDefGuards of
+          [FuncGuardedBody [] body] -> pure body
+          _ ->
+            autocollectError . unlines $
+              [ "Test should have no guards."
+              , "Found guards at " ++ getSpanLine funcName
+              ]
+
+      -- tester (...funcArgs) (funcBody :: funcBodyType)
+      let funcBodyWithType = maybe funcBody (genLoc . ExprWithTySig noAnn funcBody) mFuncBodyType
+          testBody =
+            case testType of
+              TestSingle tester ->
+                genLoc . mkExplicitList $
+                  [ mkHsApps (lhsvar $ genLoc $ fromTester names tester) $
+                      map patternToExpr funcDefArgs ++ [funcBodyWithType]
+                  ]
+              TestBatch
+                | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
+                | maybe False (not . isListOfTestTree names) mFuncBodyType -> autocollectError "test_batch needs to be set to a [TestTree]"
+                | otherwise -> funcBodyWithType
+
+      pure . concat $
+        [ if needsFuncSig
+            then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
+            else []
+        , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+        ]
 
 {- |
 Convert the given pattern to the expression that it would represent
@@ -285,3 +286,8 @@ getNextTestName = do
   let nextTestName = mkLRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName
+
+{----- Utilities -----}
+
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f = fmap concat . mapM f
