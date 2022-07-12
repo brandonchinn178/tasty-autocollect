@@ -65,7 +65,7 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ mapM (convertTest names) $ hsmodDecls modl
+      let (decls, testNames) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
             , hsmodDecls = mkTestsList testNames ++ decls
@@ -101,9 +101,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 If the given declaration is a test, return the converted test, or otherwise
 return it unmodified
 -}
-convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM (LHsDecl GhcPs)
-convertTest names loc =
-  case parseDecl loc of
+convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
+convertTest names ldecl =
+  case parseDecl ldecl of
     -- e.g. test_testCase :: Assertion
     -- =>   test1 :: [TestTree]
     Just (FuncSig [funcName] ty)
@@ -115,7 +115,7 @@ convertTest names loc =
               , testName
               , testHsType = ty
               }
-          pure (genFuncSig testName (getListOfTestTreeType names) <$ loc)
+          pure [genFuncSig testName (getListOfTestTreeType names) <$ ldecl]
     -- e.g. test_testCase "test name" = <body>
     -- =>   test1 = [testCase "test name" (<body> :: Assertion)]
     Just (FuncDef funcName funcDefs)
@@ -160,9 +160,9 @@ convertTest names loc =
                     | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
                     | otherwise -> funcBodyWithType
 
-          pure (genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ loc)
+          pure [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
     -- anything else leave unmodified
-    _ -> pure loc
+    _ -> pure [ldecl]
 
 {- |
 Convert the given pattern to the expression that it would represent
@@ -285,3 +285,8 @@ getNextTestName = do
   let nextTestName = mkLRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName
+
+{----- Utilities -----}
+
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f = fmap concat . mapM f
