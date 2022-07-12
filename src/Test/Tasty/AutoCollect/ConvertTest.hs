@@ -9,7 +9,7 @@ module Test.Tasty.AutoCollect.ConvertTest (
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
-import Data.List (intercalate, stripPrefix)
+import Data.List (stripPrefix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 
@@ -121,24 +121,18 @@ convertTest names ldecl =
     Just (FuncDef funcName funcDefs)
       | Just testType <- parseTestType funcName -> do
           mSigInfo <- getLastSeenSig
-
-          case funcDefs of
-            [] -> autocollectError $ "Test unexpectedly had no bindings at " ++ getSpanLine funcName
-            [funcDef] -> convertSingleTest funcName testType mSigInfo (unLoc funcDef)
-            _ ->
-              autocollectError . unlines $
-                [ "Found multiple tests named " ++ fromRdrName funcName ++ " at: " ++ intercalate ", " (map getSpanLine funcDefs)
-                , "Did you forget to add a type annotation for a test?"
-                ]
+          concatMapM (convertSingleTest funcName testType mSigInfo . unLoc) funcDefs
     -- anything else leave unmodified
     _ -> pure [ldecl]
   where
     convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
-      (testName, funcBodyType) <-
+      (testName, mFuncBodyType, needsFuncSig) <-
         case mSigInfo of
-          Nothing -> autocollectError $ "Found test without type signature at " ++ getSpanLine funcName
+          Nothing -> do
+            testName <- getNextTestName
+            pure (testName, Nothing, True)
           Just SigInfo{testType = testTypeFromSig, ..}
-            | testType == testTypeFromSig -> pure (testName, testHsType)
+            | testType == testTypeFromSig -> pure (testName, Just testHsType, False)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
       funcBody <-
@@ -151,7 +145,7 @@ convertTest names ldecl =
               ]
 
       -- tester (...funcArgs) (funcBody :: funcBodyType)
-      let funcBodyWithType = genLoc $ ExprWithTySig noAnn funcBody funcBodyType
+      let funcBodyWithType = maybe funcBody (genLoc . ExprWithTySig noAnn funcBody) mFuncBodyType
           testBody =
             case testType of
               TestSingle tester ->
@@ -161,10 +155,15 @@ convertTest names ldecl =
                   ]
               TestBatch
                 | not (null funcDefArgs) -> autocollectError "test_batch should not be used with arguments"
-                | not (isListOfTestTree names funcBodyType) -> autocollectError "test_batch needs to be set to a [TestTree]"
+                | maybe False (not . isListOfTestTree names) mFuncBodyType -> autocollectError "test_batch needs to be set to a [TestTree]"
                 | otherwise -> funcBodyWithType
 
-      pure [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+      pure . concat $
+        [ if needsFuncSig
+            then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
+            else []
+        , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+        ]
 
 {- |
 Convert the given pattern to the expression that it would represent
