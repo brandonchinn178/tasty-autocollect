@@ -27,6 +27,8 @@ extra-source-files:
     test/golden/test_args.golden
     test/golden/test_batch_args.golden
     test/golden/test_batch_type.golden
+    test/golden/test_prop_bad_arg.golden
+    test/golden/test_prop_no_args.golden
     test/golden/test_todo_args.golden
     test/golden/test_todo_type.golden
     test/golden/test_type.golden

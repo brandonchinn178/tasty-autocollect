@@ -17,4 +17,7 @@ test = testCase "Reverse" $ reverse [1, 2, 3] @?= ([3, 2, 1] :: [Int])
 
 test = testProperty "reverse . reverse === id" $ \xs -> (reverse . reverse) xs === id (xs :: [Int])
 
+test_prop :: [Int] -> Property
+test_prop "reverse . reverse === id" xs = (reverse . reverse) xs === id xs
+
 test = goldenVsString "Example golden test" "test/golden/example.golden" $ pure "example"

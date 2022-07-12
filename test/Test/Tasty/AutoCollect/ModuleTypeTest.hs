@@ -24,11 +24,13 @@ test = testCase "parseModuleType finds first comment" $ do
     main = "{- AUTOCOLLECT.MAIN -}"
     test = "{- AUTOCOLLECT.TEST -}"
 
-test = testProperty "parseModuleType parses MAIN case-insensitive" $
+test_prop :: Property
+test_prop "parseModuleType parses MAIN case-insensitive" =
   forAll (genMixedCase "{- AUTOCOLLECT.MAIN -}") $ \main ->
     parseModuleType main `satisfies` just ($(qADT 'ModuleMain) anything)
 
-test = testProperty "parseModuleType parses TEST case-insensitive" $
+test_prop :: Property
+test_prop "parseModuleType parses TEST case-insensitive" =
   forAll (genMixedCase "{- AUTOCOLLECT.TEST -}") $ \test ->
     parseModuleType test === Just ModuleTest
 

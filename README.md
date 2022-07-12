@@ -145,6 +145,26 @@ suite_name = foo
 
 In addition to automatically collecting tests, this library also provides some additional functionality out-of-the-box, to make writing + managing tests a seamless experience.
 
+### Integration with QuickCheck/SmallCheck/etc.
+
+Property test frameworks like QuickCheck or SmallCheck work better when defining the types of arguments instead of using lambdas. So there's a special syntax for defining properties:
+
+```hs
+test_prop :: [Int] -> Property
+test_prop "reverse . reverse === id" xs = (reverse . reverse) xs === id xs
+```
+
+This will be rewritten to the equivalent of:
+
+```hs
+test =
+  testProperty
+    "reverse . reverse === id"
+    ( (\xs -> (reverse . reverse) xs === id xs)
+        :: [Int] -> Property
+    )
+```
+
 ### Marking tests as "TODO"
 
 If you're of the Test Driven Development (TDD) mentality, you might want to specify what tests you want to write before actually writing any code. In this workflow, you might not even know what kind of test you want to write (e.g. HUnit, QuickCheck, etc.).

@@ -125,7 +125,7 @@ convertTest names ldecl =
     _ -> pure [ldecl]
   where
     convertSingleTest funcName testType mSigInfo FuncSingleDef{..} = do
-      (testName, _, needsFuncSig) <-
+      (testName, mSigType, needsFuncSig) <-
         case mSigInfo of
           Nothing -> do
             testName <- getNextTestName
@@ -148,6 +148,23 @@ convertTest names ldecl =
           TestNormal -> do
             checkNoArgs testType funcDefArgs
             pure $ singleExpr funcBody
+          TestProp -> do
+            (name, remainingPats) <-
+              case funcDefArgs of
+                [] -> autocollectError "test_prop requires at least the name of the test"
+                L _ (LitPat _ (HsString _ s)) : rest -> return (unpackFS s, rest)
+                arg : _ ->
+                  autocollectError . unlines $
+                    [ "test_prop expected a String for the name of the test."
+                    , "Got: " ++ showPpr arg
+                    ]
+            let propBody = mkHsLam remainingPats funcBody
+            pure . singleExpr $
+              mkHsApps
+                (lhsvar $ mkLRdrName "testProperty")
+                [ genLoc $ HsLit noAnn $ mkHsString name
+                , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
+                ]
           TestTodo -> do
             checkNoArgs testType funcDefArgs
             pure . singleExpr $
@@ -180,6 +197,7 @@ testListName = mkLRdrName testListIdentifier
 
 data TestType
   = TestNormal
+  | TestProp
   | TestTodo
   | TestBatch
   deriving (Show, Eq)
@@ -187,6 +205,7 @@ data TestType
 parseTestType :: String -> Maybe TestType
 parseTestType = \case
   "test" -> Just TestNormal
+  "test_prop" -> Just TestProp
   "test_todo" -> Just TestTodo
   "test_batch" -> Just TestBatch
   _ -> Nothing
@@ -194,12 +213,14 @@ parseTestType = \case
 showTestType :: TestType -> String
 showTestType = \case
   TestNormal -> "test"
+  TestProp -> "test_prop"
   TestTodo -> "test_todo"
   TestBatch -> "test_batch"
 
 isValidForTestType :: ExternalNames -> TestType -> LHsSigWcType GhcPs -> Bool
 isValidForTestType names = \case
   TestNormal -> parsedTypeMatches $ isTypeVarNamed (name_TestTree names)
+  TestProp -> const True
   TestTodo -> parsedTypeMatches $ isTypeVarNamed (name_String names)
   TestBatch -> parsedTypeMatches $ \case
     TypeList ty -> isTypeVarNamed (name_TestTree names) ty
@@ -210,6 +231,7 @@ isValidForTestType names = \case
 typeForTestType :: TestType -> String
 typeForTestType = \case
   TestNormal -> "TestTree"
+  TestProp -> "(Testable prop => prop)"
   TestTodo -> "String"
   TestBatch -> "[TestTree]"
 

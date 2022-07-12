@@ -8,6 +8,7 @@ module Test.Tasty.AutoCollect.ConvertTestTest (
 
 import Control.Monad (forM_)
 import Data.Maybe (maybeToList)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
 import Test.Predicates.HUnit
@@ -199,3 +200,59 @@ test = testGolden "test_batch fails when specifying wrong type" "test_batch_type
       , "test_batch = []"
       ]
   return stderr
+
+{----- test_prop -----}
+
+test =
+  testCase "property tests may be written with test_prop" $ do
+    (stdout, _) <-
+      assertSuccess . runQCTest $
+        [ "test_prop :: Positive Int -> [Int] -> Bool"
+        , "test_prop \"take N returns at most N elements\" (Positive n) xs = length (take n xs) <= n"
+        ]
+    getTestLines stdout @?~ containsStripped (eq "take N returns at most N elements: OK")
+    stdout @?~ hasSubstr "passed 100 tests"
+
+test =
+  testCase "test_prop may omit type" $
+    assertSuccess_ . runQCTest $
+      [ "test_prop \"test\" x = (x :: Int) === x"
+      ]
+
+test =
+  testCase "test_prop uses any 'testProperty' function in scope" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "test_prop :: Int -> Bool"
+        , "test_prop \"my property test\" x = x == x"
+        , ""
+        , "testProperty :: String -> (Int -> Bool) -> TestTree"
+        , "testProperty name f = testCase name (f 1 @?= True)"
+        ]
+    getTestLines stdout @?~ containsStripped (eq "my property test: OK")
+
+test =
+  testGolden "test_prop fails when no arguments provided" "test_prop_no_args.golden" $ do
+    (_, stderr) <- assertAnyFailure $ runTest ["test_prop = 1 === 1"]
+    return stderr
+
+test =
+  testGolden "test_prop fails when non-string argument provided" "test_prop_bad_arg.golden" $ do
+    (_, stderr) <- assertAnyFailure $ runTest ["test_prop 11 = True"]
+    return stderr
+
+test =
+  testCase "test_prop works when -XOverloadedStrings is enabled" $
+    assertSuccess_ $
+      runTestWith
+        ( \proj -> addQuickCheck $ proj{extraGhcArgs = "-XOverloadedStrings" : extraGhcArgs proj}
+        )
+        [ "import Test.Tasty.QuickCheck"
+        , "test_prop \"a test\" = True"
+        ]
+
+runQCTest :: FileContents -> IO (ExitCode, Text, Text)
+runQCTest = runTestWith addQuickCheck . ("import Test.Tasty.QuickCheck" :)
+
+addQuickCheck :: GHCProject -> GHCProject
+addQuickCheck proj = proj{dependencies = "tasty-quickcheck" : dependencies proj}

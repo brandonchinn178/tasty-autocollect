@@ -32,7 +32,7 @@ test =
   testCase "parseConfig ignores empty lines" $
     parseConfig "\n\n\n" @?~ right anything
 
-test = testProperty "parseConfig errors on ill-formed lines" $
+test_prop "parseConfig errors on ill-formed lines" =
   forAll (invalidLine `suchThat` (not . isIgnored)) $ \line ->
     parseConfig line `satisfies` left (startsWith "Invalid configuration line:")
   where
@@ -56,30 +56,31 @@ test = testProperty "parseConfig errors on ill-formed lines" $
             Text.intercalate "=" <$> vectorOf (2 + n) linePart
         ]
 
-test = testProperty "parseConfig strips whitespace" $
-  \(ConfigPiece v) kspaces vspaces ->
-    let k' = wrapSpaces kspaces k
-        v' = wrapSpaces vspaces v
-     in parseConfig (k' <> "=" <> v') === parseConfig (k <> "=" <> v)
+test_prop :: ConfigPiece -> Spaces -> Spaces -> Property
+test_prop "parseConfig strips whitespace" (ConfigPiece v) kspaces vspaces =
+  let k' = wrapSpaces kspaces k
+      v' = wrapSpaces vspaces v
+   in parseConfig (k' <> "=" <> v') === parseConfig (k <> "=" <> v)
   where
     k = "suite_name"
 
 {----- Configuration options -----}
 
-test = testProperty "parseConfig parses suite_name" $
-  \(ConfigPiece v) ->
-    parseConfig ("suite_name = " <> v)
-      `satisfies` right (cfgSuiteName `with` just (eq v))
+test_prop :: ConfigPiece -> Property
+test_prop "parseConfig parses suite_name" (ConfigPiece v) =
+  parseConfig ("suite_name = " <> v)
+    `satisfies` right (cfgSuiteName `with` just (eq v))
 
-test = testProperty "parseConfig parses group_type" $
+test_prop :: Property
+test_prop "parseConfig parses group_type" =
   forAll (elements groupTypeOptions) $ \(groupTypeName, groupType) ->
     parseConfig ("group_type = " <> groupTypeName)
       `satisfies` right (cfgGroupType `with` eq groupType)
 
-test = testProperty "parseConfig errors on invalid group_type" $
-  \(ConfigPiece v) ->
-    v `notElem` map fst groupTypeOptions ==>
-      parseConfig ("group_type = " <> v) `satisfies` left (startsWith "Invalid group_type:")
+test_prop :: ConfigPiece -> Property
+test_prop "parseConfig errors on invalid group_type" (ConfigPiece v) =
+  v `notElem` map fst groupTypeOptions ==>
+    parseConfig ("group_type = " <> v) `satisfies` left (startsWith "Invalid group_type:")
 
 groupTypeOptions :: [(Text, AutoCollectGroupType)]
 groupTypeOptions =
@@ -88,37 +89,37 @@ groupTypeOptions =
   , ("tree", AutoCollectGroupTree)
   ]
 
-test = testProperty "parseConfig parses strip_suffix" $
-  \(ConfigPiece v) ->
-    parseConfig ("strip_suffix = " <> v)
-      `satisfies` right (cfgStripSuffix `with` eq v)
+test_prop :: ConfigPiece -> Property
+test_prop "parseConfig parses strip_suffix" (ConfigPiece v) =
+  parseConfig ("strip_suffix = " <> v)
+    `satisfies` right (cfgStripSuffix `with` eq v)
 
-test = testProperty "parseConfig parses ingredients" $
-  \(NonEmpty (map getHsIdentifier -> ingredients)) ->
-    parseConfig ("ingredients = " <> Text.intercalate "," ingredients)
-      `satisfies` right (cfgIngredients `with` eq ingredients)
+test_prop :: NonEmptyList HsIdentifier -> Property
+test_prop "parseConfig parses ingredients" (NonEmpty (map getHsIdentifier -> ingredients)) =
+  parseConfig ("ingredients = " <> Text.intercalate "," ingredients)
+    `satisfies` right (cfgIngredients `with` eq ingredients)
 
-test = testProperty "parseConfig strips whitespace when parsing ingredients" $
-  \(NonEmpty (map (first getHsIdentifier) -> identifiers)) ->
-    let ingredientsVal = Text.intercalate "," . map (\(s, spaces) -> wrapSpaces spaces s) $ identifiers
-        ingredients = map fst identifiers
-     in parseConfig ("ingredients = " <> ingredientsVal)
-          `satisfies` right (cfgIngredients `with` eq ingredients)
+test_prop :: NonEmptyList (HsIdentifier, Spaces) -> Property
+test_prop "parseConfig strips whitespace when parsing ingredients" (NonEmpty (map (first getHsIdentifier) -> identifiers)) =
+  let ingredientsVal = Text.intercalate "," . map (\(s, spaces) -> wrapSpaces spaces s) $ identifiers
+      ingredients = map fst identifiers
+   in parseConfig ("ingredients = " <> ingredientsVal)
+        `satisfies` right (cfgIngredients `with` eq ingredients)
 
-test = testProperty "parseConfig parses ingredients_override (case insensitive)" $
-  \option ->
-    parseConfig ("ingredients_override = " <> getText option)
-      `satisfies` right (cfgIngredientsOverride `with` eq (getBool option))
+test_prop :: BoolOption -> Property
+test_prop "parseConfig parses ingredients_override (case insensitive)" option =
+  parseConfig ("ingredients_override = " <> getText option)
+    `satisfies` right (cfgIngredientsOverride `with` eq (getBool option))
 
-test = testProperty "parseConfig errors on invalid ingredients_override" $
-  \(ConfigPiece v) ->
-    Text.toLower v `notElem` ["true", "false"] ==>
-      parseConfig ("ingredients_override = " <> v) `satisfies` left (startsWith "Invalid bool:")
+test_prop :: ConfigPiece -> Property
+test_prop "parseConfig errors on invalid ingredients_override" (ConfigPiece v) =
+  Text.toLower v `notElem` ["true", "false"] ==>
+    parseConfig ("ingredients_override = " <> v) `satisfies` left (startsWith "Invalid bool:")
 
-test = testProperty "parseConfig errors on unknown keys" $
-  \(ConfigPiece k) (ConfigPiece v) ->
-    (k `notElem` validKeys) && not ("#" `Text.isPrefixOf` k) ==>
-      parseConfig (k <> " = " <> v) `satisfies` left (startsWith "Invalid configuration key:")
+test_prop :: ConfigPiece -> ConfigPiece -> Property
+test_prop "parseConfig errors on unknown keys" (ConfigPiece k) (ConfigPiece v) =
+  (k `notElem` validKeys) && not ("#" `Text.isPrefixOf` k) ==>
+    parseConfig (k <> " = " <> v) `satisfies` left (startsWith "Invalid configuration key:")
   where
     validKeys =
       [ "suite_name"

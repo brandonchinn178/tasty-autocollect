@@ -1,0 +1,6 @@
+
+******************** tasty-autocollect failure ********************
+test_prop expected a String for the name of the test.
+Got: 11
+
+
