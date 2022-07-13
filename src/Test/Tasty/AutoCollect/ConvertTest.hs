@@ -135,46 +135,14 @@ convertTest names ldecl =
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      funcBody <-
+      testBody <-
         case funcDefGuards of
-          [FuncGuardedBody [] body] -> pure body
+          [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
           _ ->
             autocollectError . unlines $
               [ "Test should have no guards."
               , "Found guards at " ++ getSpanLine funcName
               ]
-
-      testBody <-
-        case testType of
-          TestNormal -> do
-            checkNoArgs testType funcDefArgs
-            pure $ singleExpr funcBody
-          TestProp -> do
-            (name, remainingPats) <-
-              case funcDefArgs of
-                [] -> autocollectError "test_prop requires at least the name of the test"
-                L _ (LitPat _ (HsString _ s)) : rest -> return (unpackFS s, rest)
-                arg : _ ->
-                  autocollectError . unlines $
-                    [ "test_prop expected a String for the name of the test."
-                    , "Got: " ++ showPpr arg
-                    ]
-            let propBody = mkHsLam remainingPats funcBody
-            pure . singleExpr $
-              mkHsApps
-                (lhsvar $ mkLRdrName "testProperty")
-                [ genLoc $ HsLit noAnn $ mkHsString name
-                , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
-                ]
-          TestTodo -> do
-            checkNoArgs testType funcDefArgs
-            pure . singleExpr $
-              mkHsApp
-                (lhsvar $ genLoc $ getRdrName $ name_testTreeTodo names)
-                (mkExprTypeSig funcBody $ mkHsTyVar (name_String names))
-          TestBatch -> do
-            checkNoArgs testType funcDefArgs
-            pure funcBody
 
       pure . concat $
         [ if isNothing mSigInfo
@@ -182,6 +150,38 @@ convertTest names ldecl =
             else []
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
         ]
+
+    convertSingleTestBody testType mSigType funcDefArgs funcBody =
+      case testType of
+        TestNormal -> do
+          checkNoArgs testType funcDefArgs
+          pure $ singleExpr funcBody
+        TestProp -> do
+          (name, remainingPats) <-
+            case funcDefArgs of
+              [] -> autocollectError "test_prop requires at least the name of the test"
+              L _ (LitPat _ (HsString _ s)) : rest -> return (unpackFS s, rest)
+              arg : _ ->
+                autocollectError . unlines $
+                  [ "test_prop expected a String for the name of the test."
+                  , "Got: " ++ showPpr arg
+                  ]
+          let propBody = mkHsLam remainingPats funcBody
+          pure . singleExpr $
+            mkHsApps
+              (lhsvar $ mkLRdrName "testProperty")
+              [ genLoc $ HsLit noAnn $ mkHsString name
+              , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
+              ]
+        TestTodo -> do
+          checkNoArgs testType funcDefArgs
+          pure . singleExpr $
+            mkHsApp
+              (lhsvar $ genLoc $ getRdrName $ name_testTreeTodo names)
+              (mkExprTypeSig funcBody $ mkHsTyVar (name_String names))
+        TestBatch -> do
+          checkNoArgs testType funcDefArgs
+          pure funcBody
 
     singleExpr = genLoc . mkExplicitList . (: [])
 
