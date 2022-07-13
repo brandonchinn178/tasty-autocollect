@@ -1,5 +1,7 @@
 # Unreleased
 
+# v0.3.0.0
+
 * Fix bug when omitting signature after specifying a signature for a prior test
 * Add support for `_expectFail`, `_expectFailBecause`, `_ignoreTest`, `_ignoreTestBecause` suffixes
 
