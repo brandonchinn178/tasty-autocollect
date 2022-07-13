@@ -209,7 +209,7 @@ test = testCase "gives informative error when ingredient lacks module" $ do
       , "ingredients = myIngredient"
       , "-}"
       ]
-  getTestLines stderr @?~ contains (eq "Ingredient needs to be fully qualified: myIngredient")
+  getTestLines stderr @?~ containsStripped (eq "Ingredient needs to be fully qualified: myIngredient")
 
 test = testCase "allows disabling default tasty ingredients" $ do
   (_, stderr) <-
