@@ -109,6 +109,7 @@ runghc GHCProject{..} =
           concat
             [ ["-hide-all-packages"]
             , ["-package " <> dep | dep <- dependencies]
+            , ["-package tasty-autocollect"]
             , extraGhcArgs
             ]
     (code, stdout, stderr) <-

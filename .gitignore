@@ -1,4 +1,6 @@
 .stack-work/
 stack-ghc-*.yaml.lock
 
+dist-newstyle/
+
 .DS_Store
