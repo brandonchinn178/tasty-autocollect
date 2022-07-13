@@ -44,6 +44,26 @@ jobs:
           files: lcov.info
         if: ${{ matrix.latest }}
 
+  cabal_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: cabal update
+      - run: cabal freeze
+      - run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cabal
+          key: ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
+          restore-keys: |
+               ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-
+      - run: cabal configure
+          --enable-tests
+          --test-show-details=streaming
+          --test-options="--color=always"
+      - run: cabal v2-build
+      - run: cabal exec -- cabal v2-test
+
   lint:
     runs-on: ubuntu-latest
     env:
