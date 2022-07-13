@@ -28,7 +28,6 @@ module TestUtils.Integration (
 
 import Control.Monad (forM_, void)
 import Data.Char (isDigit)
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -37,7 +36,14 @@ import qualified Data.Text.Lazy.Encoding as TextL
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory, (</>))
 import System.IO.Temp (withSystemTempDirectory)
-import System.Process.Typed (ExitCode (..), proc, readProcess, setWorkingDir)
+import System.Process.Typed (
+  ExitCode (..),
+  proc,
+  readProcess,
+  setWorkingDir,
+ )
+
+import Test.Tasty.AutoCollect.Utils.Text (breakOnEnd)
 
 assertStatus :: (ExitCode -> Bool) -> IO (ExitCode, Text, Text) -> IO (Text, Text)
 assertStatus isExpected testResult = do
@@ -92,18 +98,19 @@ modifyFile path f proj = proj{files = map modify (files proj)}
 runghc :: GHCProject -> IO (ExitCode, Text, Text)
 runghc GHCProject{..} =
   withSystemTempDirectory "tasty-autocollect-integration-test" $ \tmpdir -> do
+    -- create files
     forM_ files $ \(fp, contents) -> do
       let testFile = tmpdir </> fp
       createDirectoryIfMissing True (takeDirectory testFile)
       Text.writeFile testFile (Text.unlines contents)
 
+    -- run ghc
     let ghcArgs =
           concat
             [ ["-hide-all-packages"]
             , ["-package " <> dep | dep <- dependencies]
             , extraGhcArgs
             ]
-
     (code, stdout, stderr) <-
       readProcess $
         setWorkingDir tmpdir . proc "runghc" . concat $
@@ -112,8 +119,9 @@ runghc GHCProject{..} =
           , "--" : entrypoint : map Text.unpack runArgs
           ]
 
-    let decode = TextL.toStrict . TextL.decodeUtf8
     return (code, decode stdout, decode stderr)
+  where
+    decode = TextL.toStrict . TextL.decodeUtf8
 
 {----- Helpers -----}
 
@@ -164,8 +172,3 @@ normalizeTestOutput = Text.unlines . map normalize . Text.lines
       , Text.all isDigit b =
           pre
       | otherwise = s
-
-    -- Text.breakOnEnd, but omits the delimiter
-    breakOnEnd delim s =
-      let (a, b) = Text.breakOnEnd delim s
-       in (fromMaybe a (Text.stripSuffix delim a), b)
