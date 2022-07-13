@@ -33,7 +33,8 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Lazy as TextL
 import qualified Data.Text.Lazy.Encoding as TextL
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, getHomeDirectory)
+import System.Environment (lookupEnv)
 import System.FilePath (takeDirectory, (</>))
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process.Typed (
@@ -104,19 +105,26 @@ runghc GHCProject{..} =
       createDirectoryIfMissing True (takeDirectory testFile)
       Text.writeFile testFile (Text.unlines contents)
 
+    pkgDBFlag <- lookupEnv "GHC_PACKAGE_PATH" >>= \case
+      Just _ -> pure []
+      Nothing -> do
+        -- 'cabal v2-test' doesn't set this, so we need to guess a
+        -- package database to use
+        home <- getHomeDirectory
+        return ["-package-db " <> (home </> ".cabal/store/ghc-9.2.3/package.db")]
+
     -- run ghc
     let ghcArgs =
           concat
-            [ ["-hide-all-packages"]
-            , ["-package " <> dep | dep <- dependencies]
+            [ ["-package " <> Text.unpack dep | dep <- dependencies]
             , ["-package tasty-autocollect"]
-            , extraGhcArgs
+            , pkgDBFlag
+            , map Text.unpack extraGhcArgs
             ]
     (code, stdout, stderr) <-
       readProcess $
         setWorkingDir tmpdir . proc "runghc" . concat $
-          [ ["--"]
-          , map Text.unpack ghcArgs
+          [ "--" : ghcArgs
           , "--" : entrypoint : map Text.unpack runArgs
           ]
 
