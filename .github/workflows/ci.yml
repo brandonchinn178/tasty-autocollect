@@ -44,6 +44,18 @@ jobs:
           files: lcov.info
         if: ${{ matrix.latest }}
 
+  cabal_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cabal
+          key: ${{ runner.os }}-cabal-cache-${{ hashFiles('tasty-autocollect.cabal') }}
+      - run: cabal update
+      - run: cabal v2-build
+      - run: cabal exec -- cabal v2-test
+
   lint:
     runs-on: ubuntu-latest
     env:
