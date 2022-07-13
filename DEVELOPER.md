@@ -19,8 +19,6 @@ To release a new version, do the following workflow:
 
     1. Curate `CHANGELOG.md`, adding a `vX.Y.Z` section (but keep the `Unreleased` section)
 
-    1. Add comments to new features indicating when it was added (e.g. `@since v2.0.0`)
-
     1. Run `stack haddock` or `cabal haddock` and skim through documentation
 
 1. Create PR as usual and merge into `main`

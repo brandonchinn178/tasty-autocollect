@@ -1,5 +1,5 @@
 name: tasty-autocollect
-version: 0.2.0.0
+version: 0.3.0.0
 category: Testing
 synopsis: Autocollection of tasty tests.
 description: Autocollection of tasty tests. See README.md for more details.
