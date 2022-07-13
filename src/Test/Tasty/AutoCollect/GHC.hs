@@ -7,13 +7,18 @@ module Test.Tasty.AutoCollect.GHC (
   -- * Output helpers
   showPpr,
 
+  -- * Parsers
+  parseLitStrPat,
+
   -- * Builders
   genFuncSig,
   genFuncDecl,
   lhsvar,
+  mkHsVar,
   mkHsAppTypes,
   mkHsTyVar,
   mkExprTypeSig,
+  mkHsLitString,
 
   -- * Located utilities
   genLoc,
@@ -42,6 +47,13 @@ import Test.Tasty.AutoCollect.GHC.Shim
 showPpr :: Outputable a => a -> String
 showPpr = showSDocUnsafe . ppr
 
+{----- Parsers ----}
+
+parseLitStrPat :: LPat GhcPs -> Maybe String
+parseLitStrPat = \case
+  L _ (LitPat _ (HsString _ s)) -> Just (unpackFS s)
+  _ -> Nothing
+
 {----- Builders -----}
 
 genFuncSig :: LocatedN RdrName -> LHsType GhcPs -> HsDecl GhcPs
@@ -63,6 +75,9 @@ genFuncDecl funcName funcArgs funcBody mFuncWhere =
 lhsvar :: LocatedN RdrName -> LHsExpr GhcPs
 lhsvar = genLoc . HsVar NoExtField
 
+mkHsVar :: Name -> LHsExpr GhcPs
+mkHsVar = lhsvar . genLoc . getRdrName
+
 mkHsAppTypes :: LHsExpr GhcPs -> [LHsType GhcPs] -> LHsExpr GhcPs
 mkHsAppTypes = foldl' mkHsAppType
 
@@ -72,11 +87,14 @@ mkHsAppType e t = genLoc $ HsAppType xAppTypeE e (HsWC noExtField t)
 mkHsTyVar :: Name -> LHsType GhcPs
 mkHsTyVar = genLoc . HsTyVar noAnn NotPromoted . genLoc . getRdrName
 
--- | mkExprTypeSig <e> <t> = (<e> :: <t>)
+-- | mkExprTypeSig e t = [| $e :: $t |]
 mkExprTypeSig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 mkExprTypeSig e t =
   genLoc . ExprWithTySig noAnn e $
     HsWC NoExtField (hsTypeToHsSigType t)
+
+mkHsLitString :: String -> LHsExpr GhcPs
+mkHsLitString = genLoc . HsLit noAnn . mkHsString
 
 {----- Located utilities -----}
 
@@ -86,9 +104,9 @@ genLoc = L generatedSrcAnn
 firstLocatedWhere :: Ord l => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
 firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 
-getSpanLine :: GenLocated (SrcSpanAnn' a) e -> String
+getSpanLine :: SrcSpan -> String
 getSpanLine loc =
-  case srcSpanStart $ getLocA loc of
+  case srcSpanStart loc of
     Right srcLoc -> "line " ++ show (srcLocLine srcLoc)
     Left s -> s
 
