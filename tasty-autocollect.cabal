@@ -26,7 +26,12 @@ extra-source-files:
     test/golden/output_group_type_tree.golden
     test/golden/test_args.golden
     test/golden/test_batch_args.golden
+    test/golden/test_batch_expectFailBecause_output.golden
     test/golden/test_batch_type.golden
+    test/golden/test_expectFail_output.golden
+    test/golden/test_expectFailBecause_output.golden
+    test/golden/test_ignoreTest_output.golden
+    test/golden/test_ignoreTestBecause_output.golden
     test/golden/test_prop_bad_arg.golden
     test/golden/test_prop_no_args.golden
     test/golden/test_todo_args.golden
@@ -64,6 +69,7 @@ library
     , filepath >=1.4.2.1 && <2
     , ghc >=8.10 && <9.3
     , tasty >=1.4.2.1 && <2
+    , tasty-expected-failure >=0.11 && <1
     , template-haskell >=2.16 && <2.19
     , text >=1.2.3.2 && <3
     , transformers >=0.5.6.2 && <1

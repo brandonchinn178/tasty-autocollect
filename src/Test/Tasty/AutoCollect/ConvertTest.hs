@@ -1,18 +1,23 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.ConvertTest (
   plugin,
 ) where
 
+import Control.Arrow ((&&&))
 import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (isNothing)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import qualified Data.Text as Text
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
@@ -92,7 +97,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
           ]
 
     flattenTestList testsList =
-      mkHsApp (lhsvar $ genLoc $ getRdrName $ name_concat names) $
+      mkHsApp (mkHsVar $ name_concat names) $
         mkExprTypeSig testsList . genLoc $
           HsListTy noAnn (getListOfTestTreeType names)
 
@@ -125,6 +130,8 @@ convertTest names ldecl =
     -- anything else leave unmodified
     _ -> pure [ldecl]
   where
+    loc = getLocA ldecl
+
     convertSingleTest funcName testType mSigInfo (L _ FuncSingleDef{..}) = do
       (testName, mSigType) <-
         case mSigInfo of
@@ -135,46 +142,14 @@ convertTest names ldecl =
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      funcBody <-
+      testBody <-
         case funcDefGuards of
-          [FuncGuardedBody [] body] -> pure body
+          [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
           _ ->
             autocollectError . unlines $
               [ "Test should have no guards."
-              , "Found guards at " ++ getSpanLine funcName
+              , "Found guards at " ++ getSpanLine (getLocA funcName)
               ]
-
-      testBody <-
-        case testType of
-          TestNormal -> do
-            checkNoArgs testType funcDefArgs
-            pure $ singleExpr funcBody
-          TestProp -> do
-            (name, remainingPats) <-
-              case funcDefArgs of
-                [] -> autocollectError "test_prop requires at least the name of the test"
-                L _ (LitPat _ (HsString _ s)) : rest -> return (unpackFS s, rest)
-                arg : _ ->
-                  autocollectError . unlines $
-                    [ "test_prop expected a String for the name of the test."
-                    , "Got: " ++ showPpr arg
-                    ]
-            let propBody = mkHsLam remainingPats funcBody
-            pure . singleExpr $
-              mkHsApps
-                (lhsvar $ mkLRdrName "testProperty")
-                [ genLoc $ HsLit noAnn $ mkHsString name
-                , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
-                ]
-          TestTodo -> do
-            checkNoArgs testType funcDefArgs
-            pure . singleExpr $
-              mkHsApp
-                (lhsvar $ genLoc $ getRdrName $ name_testTreeTodo names)
-                (mkExprTypeSig funcBody $ mkHsTyVar (name_String names))
-          TestBatch -> do
-            checkNoArgs testType funcDefArgs
-            pure funcBody
 
       pure . concat $
         [ if isNothing mSigInfo
@@ -183,33 +158,90 @@ convertTest names ldecl =
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
         ]
 
+    convertSingleTestBody testType mSigType args body =
+      case testType of
+        TestNormal -> do
+          checkNoArgs testType args
+          pure $ singleExpr body
+        TestProp -> do
+          (name, remainingPats) <-
+            case args of
+              arg : rest | Just s <- parseLitStrPat arg -> return (s, rest)
+              [] -> autocollectError "test_prop requires at least the name of the test"
+              arg : _ ->
+                autocollectError . unlines $
+                  [ "test_prop expected a String for the name of the test."
+                  , "Got: " ++ showPpr arg
+                  ]
+          let propBody = mkHsLam remainingPats body
+          pure . singleExpr $
+            mkHsApps
+              (lhsvar $ mkLRdrName "testProperty")
+              [ mkHsLitString name
+              , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
+              ]
+        TestTodo -> do
+          checkNoArgs testType args
+          pure . singleExpr $
+            mkHsApp
+              (mkHsVar $ name_testTreeTodo names)
+              (mkExprTypeSig body $ mkHsTyVar (name_String names))
+        TestBatch -> do
+          checkNoArgs testType args
+          pure body
+        TestModify modifier testType' ->
+          withTestModifier names modifier loc args $ \args' ->
+            convertSingleTestBody testType' mSigType args' body
+
     singleExpr = genLoc . mkExplicitList . (: [])
 
     checkNoArgs testType args =
       unless (null args) $
         autocollectError . unwords $
           [ showTestType testType ++ " should not be used with arguments"
-          , "(at " ++ getSpanLine ldecl ++ ")"
+          , "(at " ++ getSpanLine loc ++ ")"
           ]
 
 -- | Identifier for the generated `tests` list.
 testListName :: LocatedN RdrName
 testListName = mkLRdrName testListIdentifier
 
+-- | Return the `[TestTree]` type.
+getListOfTestTreeType :: ExternalNames -> LHsType GhcPs
+getListOfTestTreeType names = genLoc $ HsListTy noAnn $ mkHsTyVar (name_TestTree names)
+
+{----- TestType -----}
+
 data TestType
   = TestNormal
   | TestProp
   | TestTodo
   | TestBatch
+  | TestModify TestModifier TestType
+  deriving (Show, Eq)
+
+data TestModifier
+  = ExpectFail
+  | ExpectFailBecause
+  | IgnoreTest
+  | IgnoreTestBecause
   deriving (Show, Eq)
 
 parseTestType :: String -> Maybe TestType
-parseTestType = \case
-  "test" -> Just TestNormal
-  "test_prop" -> Just TestProp
-  "test_todo" -> Just TestTodo
-  "test_batch" -> Just TestBatch
-  _ -> Nothing
+parseTestType = go . Text.splitOn "_" . Text.pack
+  where
+    go = \case
+      ["test"] -> Just TestNormal
+      ["test", "prop"] -> Just TestProp
+      ["test", "todo"] -> Just TestTodo
+      ["test", "batch"] -> Just TestBatch
+      (unsnoc -> Just (t, "expectFail")) -> TestModify ExpectFail <$> go t
+      (unsnoc -> Just (t, "expectFailBecause")) -> TestModify ExpectFailBecause <$> go t
+      (unsnoc -> Just (t, "ignoreTest")) -> TestModify IgnoreTest <$> go t
+      (unsnoc -> Just (t, "ignoreTestBecause")) -> TestModify IgnoreTestBecause <$> go t
+      _ -> Nothing
+
+    unsnoc = fmap (NonEmpty.init &&& NonEmpty.last) . NonEmpty.nonEmpty
 
 showTestType :: TestType -> String
 showTestType = \case
@@ -217,17 +249,32 @@ showTestType = \case
   TestProp -> "test_prop"
   TestTodo -> "test_todo"
   TestBatch -> "test_batch"
+  TestModify modifier tt -> showTestType tt ++ showModifier modifier
+  where
+    showModifier = \case
+      ExpectFail -> "_expectFail"
+      ExpectFailBecause -> "_expectFailBecause"
+      IgnoreTest -> "_ignoreTest"
+      IgnoreTestBecause -> "_ignoreTestBecause"
 
 isValidForTestType :: ExternalNames -> TestType -> LHsSigWcType GhcPs -> Bool
 isValidForTestType names = \case
-  TestNormal -> parsedTypeMatches $ isTypeVarNamed (name_TestTree names)
+  TestNormal -> parsedTypeMatches isTestTreeTypeVar
   TestProp -> const True
   TestTodo -> parsedTypeMatches $ isTypeVarNamed (name_String names)
   TestBatch -> parsedTypeMatches $ \case
-    TypeList ty -> isTypeVarNamed (name_TestTree names) ty
+    TypeList ty -> isTestTreeTypeVar ty
     _ -> False
+  TestModify modifier tt -> isValidForModifier tt modifier
   where
+    isValidForModifier tt = \case
+      ExpectFail -> isValidForTestType names tt
+      ExpectFailBecause -> isValidForTestType names tt
+      IgnoreTest -> isValidForTestType names tt
+      IgnoreTestBecause -> isValidForTestType names tt
+
     parsedTypeMatches f = maybe False f . parseSigWcType
+    isTestTreeTypeVar = isTypeVarNamed (name_TestTree names)
 
 typeForTestType :: TestType -> String
 typeForTestType = \case
@@ -235,15 +282,57 @@ typeForTestType = \case
   TestProp -> "(Testable prop => prop)"
   TestTodo -> "String"
   TestBatch -> "[TestTree]"
+  TestModify modifier tt -> typeForTestModifier tt modifier
+  where
+    typeForTestModifier tt = \case
+      ExpectFail -> typeForTestType tt
+      ExpectFailBecause -> typeForTestType tt
+      IgnoreTest -> typeForTestType tt
+      IgnoreTestBecause -> typeForTestType tt
 
 isTypeVarNamed :: Name -> ParsedType -> Bool
 isTypeVarNamed name = \case
   TypeVar _ (L _ n) -> rdrNameOcc n == rdrNameOcc (getRdrName name)
   _ -> False
 
--- | Return the `[TestTree]` type.
-getListOfTestTreeType :: ExternalNames -> LHsType GhcPs
-getListOfTestTreeType names = genLoc $ HsListTy noAnn $ mkHsTyVar (name_TestTree names)
+withTestModifier ::
+  Monad m =>
+  ExternalNames ->
+  TestModifier ->
+  SrcSpan ->
+  [LPat GhcPs] ->
+  ([LPat GhcPs] -> m (LHsExpr GhcPs)) ->
+  m (LHsExpr GhcPs)
+withTestModifier names modifier loc args f =
+  case modifier of
+    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
+    ExpectFailBecause ->
+      case args of
+        arg : rest
+          | Just s <- parseLitStrPat arg ->
+              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> f rest
+        _ -> needsStrArg "_expectFailBecause"
+    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> f args
+    IgnoreTestBecause ->
+      case args of
+        arg : rest
+          | Just s <- parseLitStrPat arg ->
+              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> f rest
+        _ -> needsStrArg "_ignoreTestBecause"
+  where
+    needsStrArg label =
+      autocollectError . unlines . concat $
+        [ [label ++ " requires a String argument."]
+        , case args of
+            [] -> []
+            arg : _ -> ["Got: " ++ showPpr arg]
+        , ["At: " ++ getSpanLine loc]
+        ]
+
+    applyName name = mkHsApps (mkHsVar name)
+
+    -- mapAllTests f e = [| map $f $e |]
+    mapAllTests func expr = applyName (name_map names) [func, expr]
 
 {----- Test converter monad -----}
 

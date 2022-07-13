@@ -1,0 +1,15 @@
+Main.hs
+  Test
+    failing test #1: OK (unexpected: some reason)
+       (unexpected success: some reason)
+      Use -p '/failing test #1/' to rerun this test only.
+    failing test #2: FAIL (expected: some reason)
+      ./Test.hs:6:
+      expected: 1
+       but got: 2 (expected failure)
+    failing test #3: FAIL (expected: some reason)
+      ./Test.hs:6:
+      expected: 1
+       but got: 3 (expected failure)
+
+1 out of 3 tests failed
