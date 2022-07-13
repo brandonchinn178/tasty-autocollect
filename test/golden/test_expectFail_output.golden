@@ -1,0 +1,8 @@
+Main.hs
+  Test
+    failing test: FAIL (expected)
+      ./Test.hs:5:
+      expected: 2
+       but got: 1 (expected failure)
+
+All 1 tests passed

@@ -2,15 +2,18 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.ConvertTest (
   plugin,
 ) where
 
+import Control.Arrow ((&&&))
 import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (toList)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (isNothing)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -186,6 +189,9 @@ convertTest names ldecl =
         TestBatch -> do
           checkNoArgs testType args
           pure body
+        TestModify modifier testType' ->
+          withTestModifier names modifier loc args $ \args' ->
+            convertSingleTestBody testType' mSigType args' body
 
     singleExpr = genLoc . mkExplicitList . (: [])
 
@@ -211,6 +217,14 @@ data TestType
   | TestProp
   | TestTodo
   | TestBatch
+  | TestModify TestModifier TestType
+  deriving (Show, Eq)
+
+data TestModifier
+  = ExpectFail
+  | ExpectFailBecause
+  | IgnoreTest
+  | IgnoreTestBecause
   deriving (Show, Eq)
 
 parseTestType :: String -> Maybe TestType
@@ -221,7 +235,13 @@ parseTestType = go . Text.splitOn "_" . Text.pack
       ["test", "prop"] -> Just TestProp
       ["test", "todo"] -> Just TestTodo
       ["test", "batch"] -> Just TestBatch
+      (unsnoc -> Just (t, "expectFail")) -> TestModify ExpectFail <$> go t
+      (unsnoc -> Just (t, "expectFailBecause")) -> TestModify ExpectFailBecause <$> go t
+      (unsnoc -> Just (t, "ignoreTest")) -> TestModify IgnoreTest <$> go t
+      (unsnoc -> Just (t, "ignoreTestBecause")) -> TestModify IgnoreTestBecause <$> go t
       _ -> Nothing
+
+    unsnoc = fmap (NonEmpty.init &&& NonEmpty.last) . NonEmpty.nonEmpty
 
 showTestType :: TestType -> String
 showTestType = \case
@@ -229,6 +249,13 @@ showTestType = \case
   TestProp -> "test_prop"
   TestTodo -> "test_todo"
   TestBatch -> "test_batch"
+  TestModify modifier tt -> showTestType tt ++ showModifier modifier
+  where
+    showModifier = \case
+      ExpectFail -> "_expectFail"
+      ExpectFailBecause -> "_expectFailBecause"
+      IgnoreTest -> "_ignoreTest"
+      IgnoreTestBecause -> "_ignoreTestBecause"
 
 isValidForTestType :: ExternalNames -> TestType -> LHsSigWcType GhcPs -> Bool
 isValidForTestType names = \case
@@ -238,7 +265,14 @@ isValidForTestType names = \case
   TestBatch -> parsedTypeMatches $ \case
     TypeList ty -> isTestTreeTypeVar ty
     _ -> False
+  TestModify modifier tt -> isValidForModifier tt modifier
   where
+    isValidForModifier tt = \case
+      ExpectFail -> isValidForTestType names tt
+      ExpectFailBecause -> isValidForTestType names tt
+      IgnoreTest -> isValidForTestType names tt
+      IgnoreTestBecause -> isValidForTestType names tt
+
     parsedTypeMatches f = maybe False f . parseSigWcType
     isTestTreeTypeVar = isTypeVarNamed (name_TestTree names)
 
@@ -248,11 +282,57 @@ typeForTestType = \case
   TestProp -> "(Testable prop => prop)"
   TestTodo -> "String"
   TestBatch -> "[TestTree]"
+  TestModify modifier tt -> typeForTestModifier tt modifier
+  where
+    typeForTestModifier tt = \case
+      ExpectFail -> typeForTestType tt
+      ExpectFailBecause -> typeForTestType tt
+      IgnoreTest -> typeForTestType tt
+      IgnoreTestBecause -> typeForTestType tt
 
 isTypeVarNamed :: Name -> ParsedType -> Bool
 isTypeVarNamed name = \case
   TypeVar _ (L _ n) -> rdrNameOcc n == rdrNameOcc (getRdrName name)
   _ -> False
+
+withTestModifier ::
+  Monad m =>
+  ExternalNames ->
+  TestModifier ->
+  SrcSpan ->
+  [LPat GhcPs] ->
+  ([LPat GhcPs] -> m (LHsExpr GhcPs)) ->
+  m (LHsExpr GhcPs)
+withTestModifier names modifier loc args f =
+  case modifier of
+    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
+    ExpectFailBecause ->
+      case args of
+        arg : rest
+          | Just s <- parseLitStrPat arg ->
+              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> f rest
+        _ -> needsStrArg "_expectFailBecause"
+    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> f args
+    IgnoreTestBecause ->
+      case args of
+        arg : rest
+          | Just s <- parseLitStrPat arg ->
+              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> f rest
+        _ -> needsStrArg "_ignoreTestBecause"
+  where
+    needsStrArg label =
+      autocollectError . unlines . concat $
+        [ [label ++ " requires a String argument."]
+        , case args of
+            [] -> []
+            arg : _ -> ["Got: " ++ showPpr arg]
+        , ["At: " ++ getSpanLine loc]
+        ]
+
+    applyName name = mkHsApps (mkHsVar name)
+
+    -- mapAllTests f e = [| map $f $e |]
+    mapAllTests func expr = applyName (name_map names) [func, expr]
 
 {----- Test converter monad -----}
 

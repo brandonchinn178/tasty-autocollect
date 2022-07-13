@@ -274,3 +274,57 @@ runQCTest = runTestWith addQuickCheck . ("import Test.Tasty.QuickCheck" :)
 
 addQuickCheck :: GHCProject -> GHCProject
 addQuickCheck proj = proj{dependencies = "tasty-quickcheck" : dependencies proj}
+
+{----- tasty-expected-failure integration -----}
+
+test =
+  testGolden "expectFail succeeds when test fails" "test_expectFail_output.golden" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "test_expectFail = testCase \"failing test\" $ 1 @?= 2"
+        ]
+    return (normalizeTestOutput stdout)
+
+test =
+  testGolden "expectFailBecause succeeds when test fails" "test_expectFailBecause_output.golden" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "test_expectFailBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
+        ]
+    return (normalizeTestOutput stdout)
+
+test =
+  testGolden "ignoreTest succeeds when test fails" "test_ignoreTest_output.golden" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "test_ignoreTest = testCase \"failing test\" $ 1 @?= 2"
+        ]
+    return (normalizeTestOutput stdout)
+
+test =
+  testGolden "ignoreTestBecause succeeds when test fails" "test_ignoreTestBecause_output.golden" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "test_ignoreTestBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
+        ]
+    return (normalizeTestOutput stdout)
+
+test =
+  testGolden "expected-failure modifiers work on test_batch" "test_batch_expectFailBecause_output.golden" $ do
+    (stdout, _) <-
+      assertAnyFailure . runTest $
+        [ "test_batch_expectFailBecause \"some reason\" ="
+        , "  [ testCase (\"failing test #\" ++ show x) $ x @?= 1"
+        , "  | x <- [1 .. 3 :: Int]"
+        , "  ]"
+        ]
+    return (normalizeTestOutput stdout)
+
+test =
+  testCase "expected-failure modifiers work on test_prop" $ do
+    (stdout, _) <-
+      assertSuccess . runQCTest $
+        [ "test_prop_expectFailBecause :: [Int] -> Bool"
+        , "test_prop_expectFailBecause \"some reason\" \"my property\" xs = length xs < 0"
+        ]
+    getTestLines stdout @?~ containsStripped (eq "my property: FAIL (expected: some reason)")

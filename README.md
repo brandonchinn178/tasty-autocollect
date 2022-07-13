@@ -204,6 +204,41 @@ test = testCase "test #5" $ return ()
 test = testCase "test #10" $ return ()
 ```
 
+### Integration with `tasty-expected-failures`
+
+If you need to mark a test as an expected failure or just unconditionally skip a test, you can add an appropriate suffix to your test. For example:
+
+```hs
+test_expectFail = testCase "this test should fail" $ ...
+
+test_expectFailBecause "Issue #123" = testCase "this test should fail" $ ...
+
+test_ignoreTest = testCase "this test is skipped" $ ...
+
+test_ignoreTestBecause "Issue #123" = testCase "this test is skipped" $ ...
+```
+
+The last example will be converted into the equivalent of:
+
+```hs
+tasty_test_4 :: TestTree
+tasty_test_4 =
+  ignoreTestBecause "Issue #123" $
+    testCase "this test is skipped" $ ...
+```
+
+It also works in combination with other test types, e.g. with `test_batch` to skip the entire batch of tests:
+
+```hs
+test_batch_expectFail =
+  [ testCase ("this test should fail: " ++ show x) ...
+  | x <- ...
+  ]
+
+test_prop_expectFailBecause :: Int -> Property
+test_prop_expectFailBecause "Issue #123" "some property" x = x === x
+```
+
 ## Comparison with `tasty-discover`
 
 Advantages:
