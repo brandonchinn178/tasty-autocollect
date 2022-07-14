@@ -15,16 +15,14 @@ import Test.Tasty.AutoCollect.Utils.Text
 processFile :: FilePath -> Text -> IO Text
 processFile path file =
   case parseModuleType file of
-    Just (ModuleMain cfg) -> generateMainModule cfg path
+    Just (ModuleMain cfg) -> addLinePragma $ generateMainModule cfg path
     Just ModuleTest ->
-      pure . Text.unlines $
-        [ "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.ConvertTest #-}"
-        , file'
-        ]
-    Nothing -> pure file'
+      pure
+        . addLine "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.ConvertTest #-}"
+        . addLinePragma
+        $ file
+    Nothing -> pure $ addLinePragma file
   where
-    file' =
-      Text.unlines
-        [ "{-# LINE 1 " <> quoted (Text.pack path) <> " #-}"
-        , file
-        ]
+    addLine line f = line <> "\n" <> f
+    -- this is needed to tell GHC to use original path in error messages
+    addLinePragma = addLine $ "{-# LINE 1 " <> quoted (Text.pack path) <> " #-}"
