@@ -1,5 +1,7 @@
 # Unreleased
 
+* Fix bug where errors in Main module would show the path of the temporary file instead of the original file
+
 # v0.3.0.0
 
 * Fix bug when omitting signature after specifying a signature for a prior test
