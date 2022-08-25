@@ -5,8 +5,10 @@ module Test.Tasty.AutoCollect.GenerateMainTest (
   -- $AUTOCOLLECT.TEST.export$
 ) where
 
+import qualified Data.ByteString as ByteString
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.FilePath ((</>))
 import Test.Predicates
 import Test.Predicates.HUnit
 import Test.Tasty.HUnit
@@ -35,6 +37,20 @@ test = testCase "searches recursively" $ do
       , "import Test.Tasty.HUnit"
       , "test = testCase \"test\" $ return ()"
       ]
+
+test =
+  testCase "ignores binary files" $
+    assertSuccess_ $
+      runMainWith
+        ( \proj ->
+            proj
+              { preRunCallback = \tmpdir ->
+                  ByteString.writeFile
+                    (tmpdir </> "binary-file")
+                    (ByteString.pack [0 ..])
+              }
+        )
+        ["{- AUTOCOLLECT.MAIN -}"]
 
 test_batch =
   [ testGolden
@@ -235,6 +251,7 @@ runMainWith f mainFile =
           , testFile "FooTest"
           , testFile "BarTest"
           ]
+      , preRunCallback = \_ -> pure ()
       , entrypoint = "Main.hs"
       , runArgs = []
       }

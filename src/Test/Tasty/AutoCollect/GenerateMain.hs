@@ -6,12 +6,13 @@ module Test.Tasty.AutoCollect.GenerateMain (
   generateMainModule,
 ) where
 
+import qualified Data.ByteString as ByteString
 import Data.List (sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+import qualified Data.Text.Encoding as Text
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
@@ -76,10 +77,10 @@ findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestMo
     testDir = takeDirectory path
 
     toTestModule fp = do
-      fileContents <- Text.readFile fp
+      fileContentsBS <- ByteString.readFile fp
       return $
-        case (splitExtensions fp, parseModuleType fileContents) of
-          ((fpNoExt, ".hs"), Just ModuleTest) ->
+        case (splitExtensions fp, parseModuleType <$> Text.decodeUtf8' fileContentsBS) of
+          ((fpNoExt, ".hs"), Right (Just ModuleTest)) ->
             let moduleName = Text.replace "/" "." . Text.pack . makeRelative testDir $ fpNoExt
              in Just
                   TestModule

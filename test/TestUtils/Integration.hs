@@ -76,6 +76,7 @@ data GHCProject = GHCProject
   { dependencies :: [Text]
   , extraGhcArgs :: [Text]
   , files :: [(FilePath, FileContents)]
+  , preRunCallback :: FilePath -> IO ()
   , entrypoint :: FilePath
   , runArgs :: [Text]
   }
@@ -96,6 +97,8 @@ runghc GHCProject{..} =
       let testFile = tmpdir </> fp
       createDirectoryIfMissing True (takeDirectory testFile)
       Text.writeFile testFile (Text.unlines contents)
+
+    preRunCallback tmpdir
 
     let ghcArgs =
           concat
@@ -136,6 +139,7 @@ runTestWith f contents =
           [ ("Test.hs", testFilePrefix ++ contents)
           , ("Main.hs", ["{- AUTOCOLLECT.MAIN -}"])
           ]
+      , preRunCallback = \_ -> pure ()
       , entrypoint = "Main.hs"
       , runArgs = []
       }
