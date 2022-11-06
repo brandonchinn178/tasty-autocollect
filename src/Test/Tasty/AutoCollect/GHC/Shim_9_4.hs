@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Test.Tasty.AutoCollect.GHC.Shim_9_2 (
+module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
   -- * Re-exports
   module X,
 
@@ -44,11 +44,21 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_2 (
 -- Re-exports
 import GHC.Driver.Main as X (getHscEnv)
 import GHC.Hs as X hiding (comment, mkHsAppType, mkHsAppTypes)
-import GHC.Plugins as X hiding (AnnBind (..), AnnExpr' (..), getHscEnv, showPpr, srcSpanStart, varName)
+import GHC.Plugins as X hiding (
+  AnnBind (..),
+  AnnExpr' (..),
+  getHscEnv,
+  msg,
+  showPpr,
+  srcSpanStart,
+  thNameToGhcNameIO,
+  varName,
+ )
 import GHC.Types.Name.Cache as X (NameCache)
 
-import Data.IORef (IORef)
 import qualified Data.Text as Text
+import qualified GHC.Data.Strict as Strict
+import qualified GHC.Plugins as GHC (thNameToGhcNameIO)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified GHC.Types.SrcLoc as GHC (srcSpanStart)
 import qualified Language.Haskell.TH as TH
@@ -68,8 +78,8 @@ setKeepRawTokenStream plugin =
             }
     }
 
-withParsedResultModule :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
-withParsedResultModule = flip ($)
+withParsedResultModule :: ParsedResult -> (HsParsedModule -> HsParsedModule) -> ParsedResult
+withParsedResultModule result f = result{parsedResultModule = f $ parsedResultModule result}
 
 {----- Compat / Annotations -----}
 
@@ -80,10 +90,7 @@ getExportComments _ = map fromLEpaComment . priorComments . epAnnComments . ann 
     fromLEpaComment (L Anchor{anchor} EpaComment{ac_tok}) =
       L anchor $ (Text.unpack . Text.strip . unwrap) ac_tok
     unwrap = \case
-      EpaDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
-      EpaDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
-      EpaDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
-      EpaDocSection _ s -> Text.pack s
+      EpaDocComment doc -> Text.pack $ renderHsDocString doc
       EpaDocOptions s -> Text.pack s
       EpaLineComment s -> withoutPrefix "--" $ Text.pack s
       EpaBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
@@ -93,7 +100,7 @@ generatedSrcAnn :: SrcAnn ann
 generatedSrcAnn = SrcSpanAnn noAnn generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
-toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Nothing)
+toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Strict.Nothing)
 
 {----- Compat / SrcSpan -----}
 
@@ -155,21 +162,5 @@ xAppTypeE = generatedSrcSpan
 
 {----- Backports -----}
 
--- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
-thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
-thNameToGhcNameIO hscEnv cache name =
-  fmap fst
-    . runCoreM
-      hscEnv{hsc_NC = cache}
-      (unused "cr_rule_base")
-      (strict '.')
-      (unused "cr_module")
-      (strict mempty)
-      (unused "cr_print_unqual")
-      (unused "cr_loc")
-    $ thNameToGhcName name
-  where
-    unused msg = error $ "unexpectedly used: " ++ msg
-
-    -- marks fields that are strict, so we can't use `unused`
-    strict = id
+thNameToGhcNameIO :: HscEnv -> NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO _ = GHC.thNameToGhcNameIO

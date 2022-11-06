@@ -1,5 +1,7 @@
 # Unreleased
 
+* Added support for GHC 9.4
+
 # v0.3.1.0
 
 * Fix bug where errors in Main module would show the path of the temporary file instead of the original file

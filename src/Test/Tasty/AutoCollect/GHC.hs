@@ -31,14 +31,11 @@ module Test.Tasty.AutoCollect.GHC (
   mkRdrNameType,
   mkLRdrNameType,
   fromRdrName,
-  thNameToGhcNameIO,
 ) where
 
 import Data.Foldable (foldl')
-import Data.IORef (IORef)
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim
 
@@ -126,22 +123,3 @@ mkLRdrNameType = genLoc . mkRdrNameType
 
 fromRdrName :: LocatedN RdrName -> String
 fromRdrName = occNameString . rdrNameOcc . unLoc
-
--- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
-thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
-thNameToGhcNameIO hscEnv cache name =
-  fmap fst
-    . runCoreM
-      hscEnv{hsc_NC = cache}
-      (unused "cr_rule_base")
-      (strict '.')
-      (unused "cr_module")
-      (strict mempty)
-      (unused "cr_print_unqual")
-      (unused "cr_loc")
-    $ thNameToGhcName name
-  where
-    unused msg = error $ "unexpectedly used: " ++ msg
-
-    -- marks fields that are strict, so we can't use `unused`
-    strict = id

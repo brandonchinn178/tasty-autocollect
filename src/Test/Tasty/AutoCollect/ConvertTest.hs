@@ -30,10 +30,10 @@ plugin =
   setKeepRawTokenStream
     defaultPlugin
       { pluginRecompile = purePlugin
-      , parsedResultAction = \_ _ modl -> do
+      , parsedResultAction = \_ _ result -> do
           env <- getHscEnv
           names <- liftIO $ loadExternalNames env
-          pure $ transformTestModule names modl
+          pure $ withParsedResultModule result (transformTestModule names)
       }
 
 {- |
