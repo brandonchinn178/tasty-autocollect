@@ -85,16 +85,6 @@ jobs:
       - name: Run fourmolu
         run: fourmolu -m check $(git ls-files '*.hs')
 
-      - name: Install black
-        run: pip install black==22.6.0
-      - name: Run black
-        run: black --check --diff $(git ls-files '*.py')
-
-      - name: Install pyright
-        run: npm install -g pyright@1.1.258
-      - name: Run pyright
-        run: pyright
-
   check_sdist:
     runs-on: ubuntu-latest
     steps:
@@ -103,8 +93,13 @@ jobs:
         with:
           path: ~/.stack
           key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml', 'package.yaml') }}
+
+      - name: Strip unreleased section from CHANGELOG
+        run: sed -i -n '/^# Unreleased/d; /^# /,$p' CHANGELOG.md
+
       - name: Create sdist bundle
         run: stack sdist --test-tarball --tar-dir .
+
       - uses: actions/upload-artifact@v3
         with:
           name: tasty-autocollect-sdist
