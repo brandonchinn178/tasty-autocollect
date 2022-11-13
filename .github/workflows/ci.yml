@@ -60,12 +60,16 @@ jobs:
           key: ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
           restore-keys: |
                ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-
-      - run: cabal configure
-          --enable-tests
-          --test-show-details=streaming
-          --test-options="--color=always"
-      - run: cabal v2-build
-      - run: cabal exec -- cabal v2-test
+      - run:
+          cabal configure
+            --enable-tests
+            --test-show-details=streaming
+            --test-options="--color=always"
+            --write-ghc-environment-files=always
+      - run: |
+          cabal v2-build
+          echo "GHC_ENVIRONMENT=${PWD}/$(ls .ghc.environment.*)" | tee -a "$GITHUB_ENV"
+      - run: cabal v2-test
 
   lint:
     runs-on: ubuntu-latest
