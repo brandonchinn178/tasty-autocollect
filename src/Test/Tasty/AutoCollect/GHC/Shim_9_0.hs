@@ -10,6 +10,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
 
   -- ** Plugin
   setKeepRawTokenStream,
+  withParsedResultModule,
 
   -- ** Annotations
   getExportComments,
@@ -44,6 +45,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
   noAnn,
   hsTypeToHsSigType,
   hsTypeToHsSigWcType,
+  thNameToGhcNameIO,
 ) where
 
 -- Re-exports
@@ -53,11 +55,13 @@ import GHC.Parser.Annotation as X (AnnotationComment (..))
 import GHC.Plugins as X hiding (getHscEnv, showPpr, srcSpanStart, varName)
 import GHC.Types.Name.Cache as X (NameCache)
 
+import Data.IORef (IORef)
 import qualified Data.Text as Text
 import qualified GHC.Hs.Utils as GHC (mkMatch)
 import GHC.Parser.Annotation (getAnnotationComments)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified GHC.Types.SrcLoc as GHC (srcSpanStart)
+import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
 import Test.Tasty.AutoCollect.Utils.Text
@@ -70,6 +74,9 @@ setKeepRawTokenStream plugin =
     { dynflagsPlugin = \_ df ->
         pure $ df `gopt_set` Opt_KeepRawTokenStream
     }
+
+withParsedResultModule :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
+withParsedResultModule = flip ($)
 
 {----- Compat / Annotations -----}
 
@@ -175,3 +182,22 @@ hsTypeToHsSigType = mkLHsSigType
 
 hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
 hsTypeToHsSigWcType = mkLHsSigWcType
+
+-- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
+thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO hscEnv cache name =
+  fmap fst
+    . runCoreM
+      hscEnv{hsc_NC = cache}
+      (unused "cr_rule_base")
+      (strict '.')
+      (unused "cr_module")
+      (strict mempty)
+      (unused "cr_print_unqual")
+      (unused "cr_loc")
+    $ thNameToGhcName name
+  where
+    unused msg = error $ "unexpectedly used: " ++ msg
+
+    -- marks fields that are strict, so we can't use `unused`
+    strict = id

@@ -11,6 +11,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
 
   -- ** Plugin
   setKeepRawTokenStream,
+  withParsedResultModule,
 
   -- ** Annotations
   getExportComments,
@@ -48,6 +49,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
   noAnn,
   hsTypeToHsSigType,
   hsTypeToHsSigWcType,
+  thNameToGhcNameIO,
 ) where
 
 -- Re-exports
@@ -59,9 +61,11 @@ import NameCache as X (NameCache)
 
 import ApiAnnotation (getAnnotationComments)
 import Data.Foldable (foldl')
+import Data.IORef (IORef)
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as Text
 import qualified GHC.Hs.Utils as GHC (mkMatch)
+import qualified Language.Haskell.TH as TH
 import qualified OccName as NameSpace (tcName, varName)
 import qualified SrcLoc as GHC (srcSpanStart)
 
@@ -76,6 +80,9 @@ setKeepRawTokenStream plugin =
     { dynflagsPlugin = \_ df ->
         pure $ df `gopt_set` Opt_KeepRawTokenStream
     }
+
+withParsedResultModule :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
+withParsedResultModule = flip ($)
 
 {----- Compat / Annotations -----}
 
@@ -201,3 +208,22 @@ hsTypeToHsSigType = mkLHsSigType
 
 hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
 hsTypeToHsSigWcType = mkLHsSigWcType
+
+-- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
+thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO hscEnv cache name =
+  fmap fst
+    . runCoreM
+      hscEnv{hsc_NC = cache}
+      (unused "cr_rule_base")
+      (strict '.')
+      (unused "cr_module")
+      (strict mempty)
+      (unused "cr_print_unqual")
+      (unused "cr_loc")
+    $ thNameToGhcName name
+  where
+    unused msg = error $ "unexpectedly used: " ++ msg
+
+    -- marks fields that are strict, so we can't use `unused`
+    strict = id

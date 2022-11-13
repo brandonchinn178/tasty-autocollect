@@ -19,6 +19,9 @@ import GHC.Types.SrcLoc (Located)
 #elif __GLASGOW_HASKELL__ == 902
 import GHC.Types.Basic (PromotionFlag)
 import GHC.Types.Name.Reader (RdrName)
+#elif __GLASGOW_HASKELL__ == 904
+import GHC.Types.Basic (PromotionFlag)
+import GHC.Types.Name.Reader (RdrName)
 #endif
 
 #if __GLASGOW_HASKELL__ < 902
