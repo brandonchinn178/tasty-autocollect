@@ -1,4 +1,1 @@
-resolver: lts-19.5
-
-ghc-options:
-  '$locals': -Werror
+stack-ghc-9.0.yaml
