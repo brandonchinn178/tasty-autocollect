@@ -145,7 +145,25 @@ suite_name = foo
 
 * `custom_main`: If you'd like fine-grained control over how the `Main` module is generated (e.g. if you're using `NoImplicitPrelude` or custom preludes), set this to `true`. When set, it will do the following replacements:
     * `{- AUTOCOLLECT.MAIN.imports -}`: replaced with the import lines needed for the tests.
-    * `{- AUTOCOLLECT.MAIN.tests -}`: replaced with the `[TestTree]` list, all on one line. If you're using a formatter or linter, it might be helpful to do `tests = id {- AUTOCOLLECT.MAIN.tests -}` so that the code still parses.
+    * `{- AUTOCOLLECT.MAIN.tests -}`: replaced with the full `TestTree`, parenthesized and all on one line.
+
+    Example usage:
+
+    ```hs
+    {- AUTOCOLLECT.MAIN
+    custom_main = true
+    -}
+
+    {- AUTOCOLLECT.MAIN.imports -}
+    import Test.Tasty
+
+    main :: IO ()
+    main = do
+      setupSteps
+      defaultMainWithIngredients
+        customIngredients
+        {- AUTOCOLLECT.MAIN.tests -}
+    ```
 
     Due to current limitations, the above comments need to be matched exactly (e.g. not with `--` comments or extra whitespace).
 

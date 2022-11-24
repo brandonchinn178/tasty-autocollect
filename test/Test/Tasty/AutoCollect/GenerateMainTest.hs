@@ -234,6 +234,7 @@ test = testCase "allows customizing main module" $ do
     assertSuccess . runMainWith (setTestFiles testFiles) $
       [ "{- AUTOCOLLECT.MAIN"
       , "custom_main = true"
+      , "suite_name = my test suite"
       , "group_type = modules"
       , "strip_suffix = Test"
       , "-}"
@@ -244,14 +245,12 @@ test = testCase "allows customizing main module" $ do
       , "main :: IO ()"
       , "main = do"
       , "  putStrLn \"hello world!\""
-      , "  defaultMain $ testGroup \"my tests\" tests"
-      , "  where"
-      , "    tests = id {- AUTOCOLLECT.MAIN.tests -}"
+      , "  defaultMain {- AUTOCOLLECT.MAIN.tests -}"
       ]
   getTestLines stdout
     @?~ startsWith
       [ "hello world!"
-      , "my tests"
+      , "my test suite"
       , "  A"
       , "    test: OK"
       , "  A.A"

@@ -27,19 +27,19 @@ generateMainModule :: AutoCollectConfig -> FilePath -> Text -> IO Text
 generateMainModule cfg path originalMain = do
   testModules <- sortOn displayName <$> findTestModules cfg path
   let importLines = map ("import qualified " <>) $ map moduleName testModules
-      tests = generateTests cfg testModules
+      tests = generateTests cfg path testModules
   pure $
     if cfgCustomMain cfg
       then rewriteMain importLines tests originalMain
-      else mkMainModule cfg path importLines tests
+      else mkMainModule cfg importLines tests
 
 rewriteMain :: [Text] -> Text -> Text -> Text
 rewriteMain importLines tests =
   Text.replace "{- AUTOCOLLECT.MAIN.imports -}" (Text.unlines importLines)
     . Text.replace "{- AUTOCOLLECT.MAIN.tests -}" tests
 
-mkMainModule :: AutoCollectConfig -> FilePath -> [Text] -> Text -> Text
-mkMainModule AutoCollectConfig{..} path importLines tests =
+mkMainModule :: AutoCollectConfig -> [Text] -> Text -> Text
+mkMainModule AutoCollectConfig{..} importLines tests =
   Text.unlines
     [ "{-# OPTIONS_GHC -w #-}"
     , ""
@@ -49,10 +49,9 @@ mkMainModule AutoCollectConfig{..} path importLines tests =
     , Text.unlines $ importLines ++ map ("import qualified " <>) ingredientsModules
     , ""
     , "main :: IO ()"
-    , "main = defaultMainWithIngredients ingredients (testGroup suiteName tests)"
+    , "main = defaultMainWithIngredients ingredients tests"
     , "  where"
     , "    ingredients = " <> ingredients
-    , "    suiteName = " <> suiteName
     , "    tests = " <> tests
     ]
   where
@@ -69,8 +68,6 @@ mkMainModule AutoCollectConfig{..} path importLines tests =
           "" -> autocollectError $ "Ingredient needs to be fully qualified: " <> Text.unpack ingredient
           -- remove trailing "."
           s -> Text.init s
-
-    suiteName = quoted $ fromMaybe (Text.pack path) cfgSuiteName
 
 data TestModule = TestModule
   { moduleName :: Text
@@ -106,32 +103,37 @@ findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestMo
     mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
     mapMaybeM f = fmap catMaybes . mapM f
 
-generateTests :: AutoCollectConfig -> [TestModule] -> Text
-generateTests AutoCollectConfig{..} testModules =
+generateTests :: AutoCollectConfig -> FilePath -> [TestModule] -> Text
+generateTests AutoCollectConfig{..} path testModules =
   case cfgGroupType of
     AutoCollectGroupFlat ->
-      -- concat
+      -- testGroup suiteName $ concat
       --   [ My.Module.Test1.tests
       --   , My.Module.Test2.tests
       --   , ...
       --   ]
-      "concat " <> listify (map (addTestList . moduleName) testModules)
+      mkTestSuite $
+        "concat " <> listify (map (addTestList . moduleName) testModules)
     AutoCollectGroupModules ->
-      -- [ testGroup "My.Module.Test1" My.Module.Test1.tests
-      -- , testGroup "My.Module.Test2" My.Module.Test2.tests
-      -- ]
-      listify . flip map testModules $ \TestModule{..} ->
-        Text.unwords ["testGroup", quoted displayName, addTestList moduleName]
+      -- testGroup suiteName $
+      --   [ testGroup "My.Module.Test1" My.Module.Test1.tests
+      --   , testGroup "My.Module.Test2" My.Module.Test2.tests
+      --   ]
+      mkTestSuite $
+        listify . flip map testModules $ \TestModule{..} ->
+          Text.unwords ["testGroup", quoted displayName, addTestList moduleName]
     AutoCollectGroupTree ->
-      -- [ testGroup "My"
-      --     [ testGroup "Module"
-      --         [ testGroup "Test1" My.Module.Test1.tests
-      --         , testGroup "Test2" My.Module.Test2.tests
-      --         ]
-      --     ]
-      -- ]
-      let getInfo TestModule{..} = (Text.splitOn "." displayName, addTestList moduleName)
-       in TreeMap.foldTreeMap testGroupFromTree . TreeMap.fromList . map getInfo $ testModules
+      -- testGroup suiteName $
+      --   [ testGroup "My"
+      --       [ testGroup "Module"
+      --           [ testGroup "Test1" My.Module.Test1.tests
+      --           , testGroup "Test2" My.Module.Test2.tests
+      --           ]
+      --       ]
+      --   ]
+      mkTestSuite $
+        let getInfo TestModule{..} = (Text.splitOn "." displayName, addTestList moduleName)
+         in TreeMap.foldTreeMap testGroupFromTree . TreeMap.fromList . map getInfo $ testModules
   where
     addTestList moduleName = moduleName <> "." <> Text.pack testListIdentifier
     testGroupFromTree mTestsIdentifier subTrees =
@@ -142,6 +144,9 @@ generateTests AutoCollectConfig{..} testModules =
             (subGroups', Nothing) -> listify subGroups'
             ([], Just testsIdentifier) -> testsIdentifier
             (subGroups', Just testsIdentifier) -> "concat " <> listify [testsIdentifier, listify subGroups']
+
+    suiteName = quoted $ fromMaybe (Text.pack path) cfgSuiteName
+    mkTestSuite s = "(" <> Text.unwords ["testGroup", suiteName, "$", s] <> ")"
 
 {----- Helpers -----}
 
