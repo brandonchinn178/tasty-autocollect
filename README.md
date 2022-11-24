@@ -143,6 +143,12 @@ suite_name = foo
 
 * `ingredients_override`: By default, `ingredients` will add the ingredients in front of the default `tasty` ingredients. When `true`, does not automatically include the default `tasty` ingredients, for complete control over the ingredient order.
 
+* `custom_main`: If you'd like fine-grained control over how the `Main` module is generated (e.g. if you're using `NoImplicitPrelude` or custom preludes), set this to `true`. When set, it will do the following replacements:
+    * `{- AUTOCOLLECT.MAIN.imports -}`: replaced with the import lines needed for the tests.
+    * `{- AUTOCOLLECT.MAIN.tests -}`: replaced with the `[TestTree]` list, all on one line. If you're using a formatter or linter, it might be helpful to do `tests = id {- AUTOCOLLECT.MAIN.tests -}` so that the code still parses.
+
+    Due to current limitations, the above comments need to be matched exactly (e.g. not with `--` comments or extra whitespace).
+
 ### Notes
 
 * If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.

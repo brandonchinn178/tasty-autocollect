@@ -28,6 +28,7 @@ data AutoCollectConfig = AutoCollectConfig
   , cfgIngredientsOverride :: Bool
   -- ^ If true, 'cfgIngredients' overrides the default tasty ingredients;
   -- otherwise, they're prepended to the list of default ingredients (defaults to false)
+  , cfgCustomMain :: Bool
   }
   deriving (Show, Eq)
 
@@ -71,6 +72,7 @@ defaultConfig =
     , cfgIngredients = []
     , cfgIngredientsOverride = False
     , cfgStripSuffix = ""
+    , cfgCustomMain = False
     }
 
 parseConfig :: Text -> Either Text AutoCollectConfig
@@ -102,6 +104,9 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
         "ingredients_override" -> do
           override <- parseBool v
           pure $ \cfg -> cfg{cfgIngredientsOverride = override}
+        "custom_main" -> do
+          customMain <- parseBool v
+          pure $ \cfg -> cfg{cfgCustomMain = customMain}
         _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
 
     resolve fs = compose fs defaultConfig
