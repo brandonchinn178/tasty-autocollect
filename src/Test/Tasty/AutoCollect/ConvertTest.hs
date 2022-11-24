@@ -70,10 +70,10 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
+      let (decls, tests) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
-            , hsmodDecls = mkTestsList testNames ++ decls
+            , hsmodDecls = mkTestsList tests ++ decls
             }
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
@@ -89,9 +89,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     exportIE = IEVar NoExtField $ genLoc $ IEName testListName
 
     -- Generate the `tests` list
-    mkTestsList :: [LocatedN RdrName] -> [LHsDecl GhcPs]
-    mkTestsList testNames =
-      let testsList = genLoc $ mkExplicitList $ map lhsvar testNames
+    mkTestsList :: [TestInfo] -> [LHsDecl GhcPs]
+    mkTestsList tests =
+      let testsList = genLoc $ mkExplicitList $ map (lhsvar . testInfoName) tests
        in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
           , genLoc $ genFuncDecl testListName [] (flattenTestList testsList) Nothing
           ]
@@ -150,6 +150,11 @@ convertTest names ldecl =
               [ "Test should have no guards."
               , "Found guards at " ++ getSpanLine (getLocA funcName)
               ]
+
+      addTestInfo
+        TestInfo
+          { testInfoName = testName
+          }
 
       pure . concat $
         [ if isNothing mSigInfo
@@ -340,7 +345,11 @@ type ConvertTestM = State ConvertTestState
 
 data ConvertTestState = ConvertTestState
   { lastSeenSig :: Maybe SigInfo
-  , allTests :: Seq (LocatedN RdrName)
+  , allTests :: Seq TestInfo
+  }
+
+data TestInfo = TestInfo
+  { testInfoName :: LocatedN RdrName
   }
 
 data SigInfo = SigInfo
@@ -352,7 +361,7 @@ data SigInfo = SigInfo
   -- ^ The type captured in the signature
   }
 
-runConvertTestM :: ConvertTestM a -> (a, [LocatedN RdrName])
+runConvertTestM :: ConvertTestM a -> (a, [TestInfo])
 runConvertTestM m =
   fmap (toList . allTests) . State.runState m $
     ConvertTestState
@@ -371,10 +380,12 @@ setLastSeenSig info = State.modify' $ \state -> state{lastSeenSig = Just info}
 
 getNextTestName :: ConvertTestM (LocatedN RdrName)
 getNextTestName = do
-  state@ConvertTestState{allTests} <- State.get
-  let nextTestName = mkLRdrName $ testIdentifier (length allTests)
-  State.put state{allTests = allTests Seq.|> nextTestName}
-  pure nextTestName
+  ConvertTestState{allTests} <- State.get
+  pure $ mkLRdrName $ testIdentifier (length allTests)
+
+addTestInfo :: TestInfo -> ConvertTestM ()
+addTestInfo testInfo =
+  State.modify' $ \state -> state{allTests = allTests state Seq.|> testInfo}
 
 {----- Utilities -----}
 
