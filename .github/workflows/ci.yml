@@ -55,10 +55,10 @@ jobs:
       - run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
       - uses: actions/cache@v3
         with:
-          path: ~/.cabal
-          key: ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
+          path: ~/.cabal/store
+          key: ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
           restore-keys: |
-               ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-
+               ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-
       - run:
           cabal configure
             --enable-tests
