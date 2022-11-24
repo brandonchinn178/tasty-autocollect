@@ -151,7 +151,7 @@ convertTest ldecl = do
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      testBody <-
+      (testBody, _) <-
         case funcDefGuards of
           [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
           _ ->
@@ -177,7 +177,7 @@ convertTest ldecl = do
       case testType of
         TestNormal -> do
           checkNoArgs testType args
-          pure $ singleExpr body
+          pure (singleExpr body, ())
         TestProp -> do
           (name, remainingPats) <-
             case args of
@@ -189,21 +189,27 @@ convertTest ldecl = do
                   , "Got: " ++ showPpr arg
                   ]
           let propBody = mkHsLam remainingPats body
-          pure . singleExpr $
-            mkHsApps
-              (lhsvar $ mkLRdrName "testProperty")
-              [ mkHsLitString name
-              , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
-              ]
+          pure
+            ( singleExpr $
+                mkHsApps
+                  (lhsvar $ mkLRdrName "testProperty")
+                  [ mkHsLitString name
+                  , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
+                  ]
+            , ()
+            )
         TestTodo -> do
           checkNoArgs testType args
-          pure . singleExpr $
-            mkHsApp
-              (mkHsVar $ name_testTreeTodo names)
-              (mkExprTypeSig body $ mkHsTyVar (name_String names))
+          pure
+            ( singleExpr $
+                mkHsApp
+                  (mkHsVar $ name_testTreeTodo names)
+                  (mkExprTypeSig body $ mkHsTyVar (name_String names))
+            , ()
+            )
         TestBatch -> do
           checkNoArgs testType args
-          pure body
+          pure (body, ())
         TestModify modifier testType' ->
           withTestModifier names modifier loc args $ \args' ->
             convertSingleTestBody testType' mSigType args' body
@@ -316,8 +322,8 @@ withTestModifier ::
   TestModifier ->
   SrcSpan ->
   [LPat GhcPs] ->
-  ([LPat GhcPs] -> m (LHsExpr GhcPs)) ->
-  m (LHsExpr GhcPs)
+  ([LPat GhcPs] -> m (LHsExpr GhcPs, a)) ->
+  m (LHsExpr GhcPs, a)
 withTestModifier names modifier loc args f =
   case modifier of
     ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
@@ -347,7 +353,7 @@ withTestModifier names modifier loc args f =
     applyName name = mkHsApps (mkHsVar name)
 
     -- mapAllTests f e = [| map $f $e |]
-    mapAllTests func expr = applyName (name_map names) [func, expr]
+    mapAllTests func (expr, a) = (applyName (name_map names) [func, expr], a)
 
 {----- Test converter monad -----}
 
