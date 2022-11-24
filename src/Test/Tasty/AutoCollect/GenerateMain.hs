@@ -23,23 +23,37 @@ import Test.Tasty.AutoCollect.ModuleType
 import Test.Tasty.AutoCollect.Utils.Text
 import qualified Test.Tasty.AutoCollect.Utils.TreeMap as TreeMap
 
-generateMainModule :: AutoCollectConfig -> FilePath -> IO Text
-generateMainModule cfg@AutoCollectConfig{..} path = do
+generateMainModule :: AutoCollectConfig -> FilePath -> Text -> IO Text
+generateMainModule cfg path originalMain = do
   testModules <- sortOn displayName <$> findTestModules cfg path
-  pure . Text.unlines $
+  let importLines = map ("import qualified " <>) $ map moduleName testModules
+      tests = generateTests cfg testModules
+  pure $
+    if cfgCustomMain cfg
+      then rewriteMain importLines tests originalMain
+      else mkMainModule cfg path importLines tests
+
+rewriteMain :: [Text] -> Text -> Text -> Text
+rewriteMain importLines tests =
+  Text.replace "{- AUTOCOLLECT.MAIN.imports -}" (Text.unlines importLines)
+    . Text.replace "{- AUTOCOLLECT.MAIN.tests -}" tests
+
+mkMainModule :: AutoCollectConfig -> FilePath -> [Text] -> Text -> Text
+mkMainModule AutoCollectConfig{..} path importLines tests =
+  Text.unlines
     [ "{-# OPTIONS_GHC -w #-}"
     , ""
     , "module Main (main) where"
     , ""
     , "import Test.Tasty"
-    , Text.unlines . map ("import qualified " <>) $ map moduleName testModules ++ ingredientsModules
+    , Text.unlines $ importLines ++ map ("import qualified " <>) ingredientsModules
     , ""
     , "main :: IO ()"
     , "main = defaultMainWithIngredients ingredients (testGroup suiteName tests)"
     , "  where"
     , "    ingredients = " <> ingredients
     , "    suiteName = " <> suiteName
-    , "    tests = " <> generateTests cfg testModules
+    , "    tests = " <> tests
     ]
   where
     ingredients =

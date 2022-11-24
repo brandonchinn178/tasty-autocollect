@@ -229,6 +229,49 @@ test = testCase "allows overriding suite name" $ do
       ]
   stdout @?~ startsWith "my-test-suite"
 
+test = testCase "allows customizing main module" $ do
+  (stdout, _) <-
+    assertSuccess . runMainWith (setTestFiles testFiles) $
+      [ "{- AUTOCOLLECT.MAIN"
+      , "custom_main = true"
+      , "group_type = modules"
+      , "strip_suffix = Test"
+      , "-}"
+      , ""
+      , "{- AUTOCOLLECT.MAIN.imports -}"
+      , "import Test.Tasty"
+      , ""
+      , "main :: IO ()"
+      , "main = do"
+      , "  putStrLn \"hello world!\""
+      , "  defaultMain $ testGroup \"my tests\" tests"
+      , "  where"
+      , "    tests = id {- AUTOCOLLECT.MAIN.tests -}"
+      ]
+  getTestLines stdout
+    @?~ startsWith
+      [ "hello world!"
+      , "my tests"
+      , "  A"
+      , "    test: OK"
+      , "  A.A"
+      , "    test: OK"
+      , "  B"
+      , "    test: OK"
+      ]
+  where
+    testFiles =
+      [ ("A.hs", testFile "A")
+      , ("A/ATest.hs", testFile "A.ATest")
+      , ("BTest.hs", testFile "BTest")
+      ]
+    testFile moduleName =
+      [ "{- AUTOCOLLECT.TEST -}"
+      , "module " <> moduleName <> " where"
+      , "import Test.Tasty.HUnit"
+      , "test = testCase \"test\" $ return ()"
+      ]
+
 {----- Helpers -----}
 
 setTestFiles :: [(FilePath, FileContents)] -> GHCProject -> GHCProject
