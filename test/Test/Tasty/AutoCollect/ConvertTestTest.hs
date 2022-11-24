@@ -212,6 +212,51 @@ test = testGolden "test_batch fails when specifying wrong type" "test_batch_type
       ]
   return stderr
 
+{----- withResource -----}
+
+test =
+  testCase "`resource_` actions can be injected" $ do
+    (stdout, _) <-
+      assertSuccess . runTest $
+        [ "resource_getInt = withResource"
+        , "  (putStrLn \"setup\" >> pure 1)"
+        , "  (\\_ -> putStrLn \"cleanup\")"
+        , ""
+        , "test (Resource getInt) ="
+        , "  testCase \"test1\" $ do"
+        , "    x <- getInt"
+        , "    x @?= 1"
+        , ""
+        , "test (Resource getInt) ="
+        , "  testCase \"test2\" $ do"
+        , "    x <- getInt"
+        , "    x @?= 1"
+        ]
+    -- TODO: check "test1 > setup > test2 > cleanup"
+    print stdout
+    undefined
+
+test =
+  testCase "`resource_` actions only get injected when named" $ do
+    -- TODO: resource1 with test1, resource2 with test2
+    undefined
+
+test =
+  testCase "errors on `resource_` action with multiple function definitions" $ do
+    undefined
+
+test =
+  testCase "errors on `resource_` action with guards" $ do
+    undefined
+
+test =
+  testCase "does not error on unused `resource_` actions" $ do
+    undefined
+
+test =
+  testCase "tests fail when referencing unknown resource" $ do
+    undefined
+
 {----- test_prop -----}
 
 test =
@@ -270,6 +315,10 @@ test =
         [ "import Test.Tasty.QuickCheck"
         , "test_prop \"a test\" = True"
         ]
+
+test =
+  testCase "test_prop may use resources" $ do
+    undefined
 
 runQCTest :: FileContents -> IO (ExitCode, Text, Text)
 runQCTest = runTestWith addQuickCheck . ("import Test.Tasty.QuickCheck" :)

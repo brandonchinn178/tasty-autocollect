@@ -12,11 +12,15 @@ import Control.Arrow ((&&&))
 import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as State
+import Data.Either (partitionEithers)
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NonEmpty
-import Data.Maybe (isNothing)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Maybe (isNothing, mapMaybe)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Test.Tasty.AutoCollect.Constants
@@ -71,16 +75,18 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
   where
     updateModule modl =
       let decls = hsmodDecls modl
+          allResources = findAllResources decls
           convertTestEnv =
             ConvertTestEnv
               { externalNames = names
+              , allResources = Map.fromList [(resourceName r, r) | r <- allResources]
               }
           (decls', tests) =
             runConvertTestM convertTestEnv $
               concatMapM convertTest decls
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
-            , hsmodDecls = mkTestsList tests ++ decls'
+            , hsmodDecls = mkTestsList allResources tests ++ decls'
             }
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
@@ -96,17 +102,25 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     exportIE = IEVar NoExtField $ genLoc $ IEName testListName
 
     -- Generate the `tests` list
-    mkTestsList :: [TestInfo] -> [LHsDecl GhcPs]
-    mkTestsList tests =
-      let testsList = genLoc $ mkExplicitList $ map (lhsvar . testInfoName) tests
+    mkTestsList :: [ResourceInfo] -> [TestInfo] -> [LHsDecl GhcPs]
+    mkTestsList allResources tests =
+      let testsList = genLoc $ mkExplicitList $ map mkTest tests
+          testsBody = addResources allResources $ flattenTestList testsList
        in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
-          , genLoc $ genFuncDecl testListName [] (flattenTestList testsList) Nothing
+          , genLoc $ genFuncDecl testListName [] testsBody Nothing
           ]
-
     flattenTestList testsList =
       mkHsApp (mkHsVar $ name_concat names) $
         mkExprTypeSig testsList . genLoc $
           HsListTy noAnn (getListOfTestTreeType names)
+
+    -- Generate each test in the `tests` list
+    mkTest :: TestInfo -> LHsExpr GhcPs
+    mkTest TestInfo{..} =
+      mkHsApps (lhsvar testInfoName) $
+        [ lhsvar resourceRdrName
+        | ResourceInfo{..} <- testInfoResources
+        ]
 
 {- |
 If the given declaration is a test, return the converted test, or otherwise
@@ -151,7 +165,7 @@ convertTest ldecl = do
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      (testBody, _) <-
+      (testBody, resources) <-
         case funcDefGuards of
           [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
           _ ->
@@ -163,25 +177,34 @@ convertTest ldecl = do
       addTestInfo
         TestInfo
           { testInfoName = testName
+          , testInfoResources = resources
           }
+
+      let testArgs =
+            [ mkVarPat resourceRdrName
+            | ResourceInfo{..} <- resources
+            ]
 
       pure . concat $
         [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
-        , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+        , [genFuncDecl testName testArgs testBody (Just funcDefWhereClause) <$ ldecl]
         ]
 
     convertSingleTestBody testType mSigType args body = do
       names <- getExternalNames
       case testType of
         TestNormal -> do
-          checkNoArgs testType args
-          pure (singleExpr body, ())
+          (resources, args') <- extractResourceArgs args
+          checkNoArgs testType args'
+          pure (singleExpr body, resources)
         TestProp -> do
-          (name, remainingPats) <-
+          (name, resources, remainingPats) <-
             case args of
-              arg : rest | Just (PatLitString s) <- parsePat arg -> return (s, rest)
+              arg : rest | Just (PatLitString name) <- parsePat arg -> do
+                (resources, remainingPats) <- extractResourceArgs rest
+                pure (name, resources, remainingPats)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
                 autocollectError . unlines $
@@ -196,20 +219,22 @@ convertTest ldecl = do
                   [ mkHsLitString name
                   , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
                   ]
-            , ()
+            , resources
             )
         TestTodo -> do
-          checkNoArgs testType args
+          (resources, args') <- extractResourceArgs args
+          checkNoArgs testType args'
           pure
             ( singleExpr $
                 mkHsApp
                   (mkHsVar $ name_testTreeTodo names)
                   (mkExprTypeSig body $ mkHsTyVar (name_String names))
-            , ()
+            , resources
             )
         TestBatch -> do
-          checkNoArgs testType args
-          pure (body, ())
+          (resources, args') <- extractResourceArgs args
+          checkNoArgs testType args'
+          pure (body, resources)
         TestModify modifier testType' ->
           withTestModifier names modifier loc args $ \args' ->
             convertSingleTestBody testType' mSigType args' body
@@ -355,12 +380,69 @@ withTestModifier names modifier loc args f =
     -- mapAllTests f e = [| map $f $e |]
     mapAllTests func (expr, a) = (applyName (name_map names) [func, expr], a)
 
+{----- Resources -----}
+
+data ResourceInfo = ResourceInfo
+  { resourceFunc :: LocatedN RdrName
+  -- ^ The original `resource_` function name
+  , resourceName :: Text
+  -- ^ The parsed name from `resourceFunc`
+  , resourceRdrName :: LocatedN RdrName
+  -- ^ The RdrName corresponding to resourceName
+  }
+
+findAllResources :: [LHsDecl GhcPs] -> [ResourceInfo]
+findAllResources = mapMaybe parseResourceInfo
+  where
+    parseResourceName = Text.stripPrefix "resource_" . Text.pack . fromRdrName
+
+    parseResourceInfo decl =
+      case parseDecl decl of
+        Just (FuncDef name defs) | Just resourceName <- parseResourceName name ->
+          checkResourceFunction name defs $
+            Just
+              ResourceInfo
+                { resourceFunc = name
+                , resourceName = resourceName
+                , resourceRdrName = mkLRdrName $ Text.unpack resourceName
+                }
+        _ -> Nothing
+
+    checkResourceFunction name defs x =
+      case defs of
+        [L _ FuncSingleDef{..}] | [FuncGuardedBody [] _] <- funcDefGuards -> x
+        _ ->
+          autocollectError . unlines $
+            [ "Invalid resource definition: " ++ showPpr name
+            , "`resource_` definitions must have exactly one function binding and no guards"
+            ]
+
+addResources :: [ResourceInfo] -> LHsExpr GhcPs -> LHsExpr GhcPs
+addResources = flip (foldr go)
+  where
+    go ResourceInfo{..} testsList =
+      -- [| resource_foo $ \resourceRdrName -> testsList |]
+      mkHsApp (lhsvar resourceFunc) $
+        mkHsLam [mkVarPat resourceRdrName] testsList
+
+extractResourceArgs' :: Map Text ResourceInfo -> [LPat GhcPs] -> ([ResourceInfo], [LPat GhcPs])
+extractResourceArgs' allResources = partitionEithers . map parseResourceArg
+  where
+    parseResourceArg pat =
+      case parsePat pat of
+        Just (PatPrefixCon name [PatVar arg]) | fromRdrName name == "Resource" ->
+          case Text.pack (fromRdrName arg) `Map.lookup` allResources of
+            Nothing -> autocollectError $ "Unknown resource: " ++ showPpr name
+            Just resource -> Left resource
+        _ -> Right pat
+
 {----- Test converter monad -----}
 
 type ConvertTestM = State ConvertTestState
 
 data ConvertTestEnv = ConvertTestEnv
   { externalNames :: ExternalNames
+  , allResources :: Map Text ResourceInfo
   }
 
 data ConvertTestState = ConvertTestState
@@ -371,6 +453,7 @@ data ConvertTestState = ConvertTestState
 
 data TestInfo = TestInfo
   { testInfoName :: LocatedN RdrName
+  , testInfoResources :: [ResourceInfo]
   }
 
 data SigInfo = SigInfo
@@ -411,6 +494,11 @@ getNextTestName = do
 addTestInfo :: TestInfo -> ConvertTestM ()
 addTestInfo testInfo =
   State.modify' $ \state -> state{allTests = allTests state Seq.|> testInfo}
+
+extractResourceArgs :: [LPat GhcPs] -> ConvertTestM ([ResourceInfo], [LPat GhcPs])
+extractResourceArgs args = do
+  ConvertTestEnv{allResources} <- State.gets convertTestEnv
+  pure $ extractResourceArgs' allResources args
 
 {----- Utilities -----}
 

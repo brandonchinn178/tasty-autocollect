@@ -164,6 +164,7 @@ parsePat (L _ pat) =
     VarPat _ name -> Just $ PatVar name
     ConPat _ name (PrefixCon _ args) -> PatPrefixCon name <$> mapM parsePat args
     LitPat _ (HsString _ s) -> Just $ PatLitString $ unpackFS s
+    ParPat _ p -> parsePat p
     _ -> Nothing
 
 {----- Backports -----}

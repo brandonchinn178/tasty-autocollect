@@ -16,6 +16,7 @@ module Test.Tasty.AutoCollect.GHC (
   mkHsTyVar,
   mkExprTypeSig,
   mkHsLitString,
+  mkVarPat,
 
   -- * Located utilities
   genLoc,
@@ -82,6 +83,9 @@ mkExprTypeSig e t =
 
 mkHsLitString :: String -> LHsExpr GhcPs
 mkHsLitString = genLoc . HsLit noAnn . mkHsString
+
+mkVarPat :: LocatedN RdrName -> LPat GhcPs
+mkVarPat = genLoc . VarPat NoExtField
 
 {----- Located utilities -----}
 
