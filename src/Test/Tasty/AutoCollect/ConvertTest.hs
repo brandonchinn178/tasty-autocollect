@@ -70,10 +70,17 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, tests) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
+      let decls = hsmodDecls modl
+          convertTestEnv =
+            ConvertTestEnv
+              { externalNames = names
+              }
+          (decls', tests) =
+            runConvertTestM convertTestEnv $
+              concatMapM convertTest decls
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
-            , hsmodDecls = mkTestsList tests ++ decls
+            , hsmodDecls = mkTestsList tests ++ decls'
             }
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
@@ -105,8 +112,9 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 If the given declaration is a test, return the converted test, or otherwise
 return it unmodified
 -}
-convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
-convertTest names ldecl =
+convertTest :: LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
+convertTest ldecl = do
+  names <- getExternalNames
   case parseDecl ldecl of
     Just (FuncSig [funcName] ty)
       | Just testType <- parseTestType (fromRdrName funcName) -> do
@@ -133,6 +141,7 @@ convertTest names ldecl =
     loc = getLocA ldecl
 
     convertSingleTest funcName testType mSigInfo (L _ FuncSingleDef{..}) = do
+      names <- getExternalNames
       (testName, mSigType) <-
         case mSigInfo of
           Nothing -> do
@@ -163,7 +172,8 @@ convertTest names ldecl =
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
         ]
 
-    convertSingleTestBody testType mSigType args body =
+    convertSingleTestBody testType mSigType args body = do
+      names <- getExternalNames
       case testType of
         TestNormal -> do
           checkNoArgs testType args
@@ -343,8 +353,13 @@ withTestModifier names modifier loc args f =
 
 type ConvertTestM = State ConvertTestState
 
+data ConvertTestEnv = ConvertTestEnv
+  { externalNames :: ExternalNames
+  }
+
 data ConvertTestState = ConvertTestState
-  { lastSeenSig :: Maybe SigInfo
+  { convertTestEnv :: ConvertTestEnv
+  , lastSeenSig :: Maybe SigInfo
   , allTests :: Seq TestInfo
   }
 
@@ -361,13 +376,17 @@ data SigInfo = SigInfo
   -- ^ The type captured in the signature
   }
 
-runConvertTestM :: ConvertTestM a -> (a, [TestInfo])
-runConvertTestM m =
+runConvertTestM :: ConvertTestEnv -> ConvertTestM a -> (a, [TestInfo])
+runConvertTestM env m =
   fmap (toList . allTests) . State.runState m $
     ConvertTestState
-      { lastSeenSig = Nothing
+      { convertTestEnv = env
+      , lastSeenSig = Nothing
       , allTests = Seq.Empty
       }
+
+getExternalNames :: ConvertTestM ExternalNames
+getExternalNames = State.gets (externalNames . convertTestEnv)
 
 getLastSeenSig :: ConvertTestM (Maybe SigInfo)
 getLastSeenSig = do
