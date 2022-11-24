@@ -181,7 +181,7 @@ convertTest ldecl = do
         TestProp -> do
           (name, remainingPats) <-
             case args of
-              arg : rest | Just s <- parseLitStrPat arg -> return (s, rest)
+              arg : rest | Just (PatLitString s) <- parsePat arg -> return (s, rest)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
                 autocollectError . unlines $
@@ -324,14 +324,14 @@ withTestModifier names modifier loc args f =
     ExpectFailBecause ->
       case args of
         arg : rest
-          | Just s <- parseLitStrPat arg ->
+          | Just (PatLitString s) <- parsePat arg ->
               mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> f rest
         _ -> needsStrArg "_expectFailBecause"
     IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> f args
     IgnoreTestBecause ->
       case args of
         arg : rest
-          | Just s <- parseLitStrPat arg ->
+          | Just (PatLitString s) <- parsePat arg ->
               mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> f rest
         _ -> needsStrArg "_ignoreTestBecause"
   where

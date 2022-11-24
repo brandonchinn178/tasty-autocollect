@@ -5,6 +5,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_Common (
   FuncSingleDef (..),
   FuncGuardedBody (..),
   ParsedType (..),
+  ParsedPat (..),
 ) where
 
 import GHC.Hs
@@ -47,3 +48,8 @@ data FuncGuardedBody = FuncGuardedBody
 data ParsedType
   = TypeVar PromotionFlag (LocatedN RdrName)
   | TypeList ParsedType
+
+data ParsedPat
+  = PatVar (LocatedN RdrName)
+  | PatPrefixCon (LocatedN RdrName) [ParsedPat]
+  | PatLitString String

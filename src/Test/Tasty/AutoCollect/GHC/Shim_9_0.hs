@@ -36,6 +36,9 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
   mkExplicitTuple,
   xAppTypeE,
 
+  -- ** Pat
+  parsePat,
+
   -- * Backports
   SrcAnn,
   SrcSpanAnn',
@@ -161,6 +164,16 @@ mkExplicitTuple = ExplicitTuple noAnn . map (L generatedSrcAnn)
 
 xAppTypeE :: XAppTypeE GhcPs
 xAppTypeE = noExtField
+
+{----- Compat / Pat -----}
+
+parsePat :: LPat GhcPs -> Maybe ParsedPat
+parsePat (L _ pat) =
+  case pat of
+    VarPat _ name -> Just $ PatVar name
+    ConPat _ name (PrefixCon args) -> PatPrefixCon name <$> mapM parsePat args
+    LitPat _ (HsString _ s) -> Just $ PatLitString $ unpackFS s
+    _ -> Nothing
 
 {----- Backports -----}
 

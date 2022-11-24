@@ -7,9 +7,6 @@ module Test.Tasty.AutoCollect.GHC (
   -- * Output helpers
   showPpr,
 
-  -- * Parsers
-  parseLitStrPat,
-
   -- * Builders
   genFuncSig,
   genFuncDecl,
@@ -43,13 +40,6 @@ import Test.Tasty.AutoCollect.GHC.Shim
 
 showPpr :: Outputable a => a -> String
 showPpr = showSDocUnsafe . ppr
-
-{----- Parsers ----}
-
-parseLitStrPat :: LPat GhcPs -> Maybe String
-parseLitStrPat = \case
-  L _ (LitPat _ (HsString _ s)) -> Just (unpackFS s)
-  _ -> Nothing
 
 {----- Builders -----}
 
