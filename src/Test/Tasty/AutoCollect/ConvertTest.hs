@@ -155,7 +155,7 @@ convertTest ldecl = do
     loc = getLocA ldecl
 
     convertSingleTest funcName testType mSigInfo (L _ FuncSingleDef{..}) = do
-      names <- getExternalNames
+      _ <- getExternalNames
       (testName, mSigType) <-
         case mSigInfo of
           Nothing -> do
@@ -185,9 +185,10 @@ convertTest ldecl = do
             | ResourceInfo{..} <- resources
             ]
 
+      -- TODO: store type of resource, add resource type to test function type
       pure . concat $
         [ if isNothing mSigInfo
-            then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
+            then [] -- [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
         , [genFuncDecl testName testArgs testBody (Just funcDefWhereClause) <$ ldecl]
         ]

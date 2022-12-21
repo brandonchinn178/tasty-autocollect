@@ -1,5 +1,8 @@
 # Unreleased
 
+* Add support for `custom_main` configuration
+* Add support for top-level `resource_` definitions
+
 # v0.3.2.0
 
 * Added support for GHC 9.4

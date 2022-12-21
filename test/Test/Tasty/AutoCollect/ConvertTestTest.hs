@@ -214,20 +214,54 @@ test = testGolden "test_batch fails when specifying wrong type" "test_batch_type
 
 {----- withResource -----}
 
+data SomeTastyResource = forall r. TastyResource r => SomeTastyResource (Proxy r)
+
+resources :: [SomeTastyResource]
+resources =
+  [ SomeTastyResource (Proxy @"getDB")
+  ]
+
+data SomeTastyResource =
+  forall r. TastyResource r =>
+  SomeTastyResource r
+
+class KnownSymbol r => TastyResource r where
+  type TastyResourceType r
+  setupResource :: Proxy r -> IO (TastyResourceType r)
+  cleanupResource :: Proxy r -> TastyResourceType r -> IO ()
+
+instance TastyResource "getDB" where
+  type TastyResourceType "getDB" = Int
+  setupResource _ = putStrLn "setup" >> pure 1
+  cleanupResource _ x = putStrLn $ "cleanup: " ++ show x
+
+newtype Resource r = Resource (IO (TastyResourceType r))
+
+test :: Resource "getDB" -> TestTree
+test (Resource getDB) =
+  testCase "..." $ do
+    db <- getDB
+    print db
+
 test =
   testCase "`resource_` actions can be injected" $ do
     (stdout, _) <-
       assertSuccess . runTest $
-        [ "resource_getInt = withResource"
+        [ "newtype ResourceGetInt = ResourceGetInt (IO Int)"
+        , "instance Resource ResourceGetInt (IO Int) where"
+        , "  toResource :: ResourceGetInt"
+        , "  toResource (ResourceGetInt x) = Resource x"
+        , "  "
+        , "resource_getInt = withResource"
         , "  (putStrLn \"setup\" >> pure 1)"
         , "  (\\_ -> putStrLn \"cleanup\")"
         , ""
-        , "test (Resource getInt) ="
+        , "test (TastyResource getInt) ="
         , "  testCase \"test1\" $ do"
         , "    x <- getInt"
         , "    x @?= 1"
         , ""
-        , "test (Resource getInt) ="
+        , "test (TastyResource getInt) ="
         , "  testCase \"test2\" $ do"
         , "    x <- getInt"
         , "    x @?= 1"
