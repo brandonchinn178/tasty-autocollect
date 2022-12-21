@@ -1,5 +1,7 @@
 # Unreleased
 
+* Added support for where clauses in `test_prop`, where the where clause may reference the generated arguments in `test_prop`
+
 # v0.3.2.0
 
 * Added support for GHC 9.4

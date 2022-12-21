@@ -2,5 +2,5 @@
 <no location info>: error:
     
 ******************** tasty-autocollect failure ********************
-test_todo should not be used with arguments (at line 5)
+Found extraneous arguments at line 5
 

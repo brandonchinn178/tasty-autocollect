@@ -68,7 +68,7 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
+      let (decls, testNames) = runConvertTestModuleM $ concatMapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
             , hsmodDecls = mkTestsList testNames ++ decls
@@ -101,7 +101,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 
 -- | If the given declaration is a test, return the converted test, or otherwise
 -- return it unmodified
-convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
+convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestModuleM [LHsDecl GhcPs]
 convertTest names ldecl =
   case parseDecl ldecl of
     Just (FuncSig [funcName] ty)
@@ -138,9 +138,21 @@ convertTest names ldecl =
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      testBody <-
+      (testBody, ConvertTestState{mWhereClause}) <-
         case funcDefGuards of
-          [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
+          [FuncGuardedBody [] body] -> do
+            let state =
+                  ConvertTestState
+                    { mSigType
+                    , testArgs = funcDefArgs
+                    , mWhereClause = Just funcDefWhereClause
+                    }
+            pure . runConvertTestM state $ do
+              testBody <- convertSingleTestBody testType body
+              State.gets testArgs >>= \case
+                [] -> pure ()
+                _ -> autocollectError $ "Found extraneous arguments at " ++ getSpanLine loc
+              pure testBody
           _ ->
             autocollectError . unlines $
               [ "Test should have no guards."
@@ -151,17 +163,24 @@ convertTest names ldecl =
         [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
-        , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+        , [genFuncDecl testName [] testBody mWhereClause <$ ldecl]
         ]
 
-    convertSingleTestBody testType mSigType args body =
+    convertSingleTestBody testType body =
       case testType of
-        TestNormal -> do
-          checkNoArgs testType args
+        TestNormal ->
           pure $ singleExpr body
         TestProp -> do
+          -- test_prop :: <type>
+          -- test_prop "name" arg1 arg2 = <body> where <defs>
+          -- ====>
+          -- test = testProperty "name" ((\arg1 arg2 -> let <defs> in <body>) :: <type>)
+
+          state@ConvertTestState{mSigType, mWhereClause} <- State.get
+          State.put state{mSigType = Nothing, mWhereClause = Nothing}
+
           (name, remainingPats) <-
-            case args of
+            popRemainingArgs >>= \case
               arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
@@ -169,34 +188,31 @@ convertTest names ldecl =
                   [ "test_prop expected a String for the name of the test."
                   , "Got: " ++ showPpr arg
                   ]
-          let propBody = mkHsLam remainingPats body
+
+          let propBody =
+                mkHsLam remainingPats $
+                  case mWhereClause of
+                    Just defs -> genLoc $ mkLet defs body
+                    Nothing -> body
+
           pure . singleExpr $
             mkHsApps
               (lhsvar $ mkLRdrName "testProperty")
               [ mkHsLitString name
               , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
               ]
-        TestTodo -> do
-          checkNoArgs testType args
+        TestTodo ->
           pure . singleExpr $
             mkHsApp
               (mkHsVar $ name_testTreeTodo names)
               (mkExprTypeSig body $ mkHsTyVar (name_String names))
-        TestBatch -> do
-          checkNoArgs testType args
+        TestBatch ->
           pure body
         TestModify modifier testType' ->
-          withTestModifier names modifier loc args $ \args' ->
-            convertSingleTestBody testType' mSigType args' body
+          withTestModifier names modifier loc $
+            convertSingleTestBody testType' body
 
     singleExpr = genLoc . mkExplicitList . (: [])
-
-    checkNoArgs testType args =
-      unless (null args) $
-        autocollectError . unwords $
-          [ showTestType testType ++ " should not be used with arguments"
-          , "(at " ++ getSpanLine loc ++ ")"
-          ]
 
 -- | Identifier for the generated `tests` list.
 testListName :: LocatedN RdrName
@@ -239,20 +255,6 @@ parseTestType = go . Text.splitOn "_" . Text.pack
 
     unsnoc = fmap (NonEmpty.init &&& NonEmpty.last) . NonEmpty.nonEmpty
 
-showTestType :: TestType -> String
-showTestType = \case
-  TestNormal -> "test"
-  TestProp -> "test_prop"
-  TestTodo -> "test_todo"
-  TestBatch -> "test_batch"
-  TestModify modifier tt -> showTestType tt ++ showModifier modifier
-  where
-    showModifier = \case
-      ExpectFail -> "_expectFail"
-      ExpectFailBecause -> "_expectFailBecause"
-      IgnoreTest -> "_ignoreTest"
-      IgnoreTestBecause -> "_ignoreTestBecause"
-
 isValidForTestType :: ExternalNames -> TestType -> LHsSigWcType GhcPs -> Bool
 isValidForTestType names = \case
   TestNormal -> parsedTypeMatches isTestTreeTypeVar
@@ -292,36 +294,34 @@ isTypeVarNamed name = \case
   _ -> False
 
 withTestModifier ::
-  Monad m =>
   ExternalNames
   -> TestModifier
   -> SrcSpan
-  -> [LPat GhcPs]
-  -> ([LPat GhcPs] -> m (LHsExpr GhcPs))
-  -> m (LHsExpr GhcPs)
-withTestModifier names modifier loc args f =
+  -> ConvertTestM (LHsExpr GhcPs)
+  -> ConvertTestM (LHsExpr GhcPs)
+withTestModifier names modifier loc m =
   case modifier of
-    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
+    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> m
     ExpectFailBecause ->
-      case args of
-        arg : rest
+      popArg >>= \case
+        Just arg
           | Just s <- parseLitStrPat arg ->
-              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> f rest
-        _ -> needsStrArg "_expectFailBecause"
-    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> f args
+              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> m
+        mArg -> needsStrArg mArg "_expectFailBecause"
+    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> m
     IgnoreTestBecause ->
-      case args of
-        arg : rest
+      popArg >>= \case
+        Just arg
           | Just s <- parseLitStrPat arg ->
-              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> f rest
-        _ -> needsStrArg "_ignoreTestBecause"
+              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> m
+        mArg -> needsStrArg mArg "_ignoreTestBecause"
   where
-    needsStrArg label =
+    needsStrArg mArg label =
       autocollectError . unlines . concat $
         [ [label ++ " requires a String argument."]
-        , case args of
-            [] -> []
-            arg : _ -> ["Got: " ++ showPpr arg]
+        , case mArg of
+            Nothing -> []
+            Just arg -> ["Got: " ++ showPpr arg]
         , ["At: " ++ getSpanLine loc]
         ]
 
@@ -330,11 +330,40 @@ withTestModifier names modifier loc args f =
     -- mapAllTests f e = [| map $f $e |]
     mapAllTests func expr = applyName (name_map names) [func, expr]
 
-{----- Test converter monad -----}
+{----- Test function converter monad -----}
 
 type ConvertTestM = State ConvertTestState
 
 data ConvertTestState = ConvertTestState
+  { mSigType :: Maybe (LHsSigWcType GhcPs)
+  , mWhereClause :: Maybe (HsLocalBinds GhcPs)
+  , testArgs :: [LPat GhcPs]
+  }
+
+runConvertTestM :: ConvertTestState -> ConvertTestM a -> (a, ConvertTestState)
+runConvertTestM = flip State.runState
+
+popArg :: ConvertTestM (Maybe (LPat GhcPs))
+popArg = do
+  state <- State.get
+  let (mArg, rest) =
+        case testArgs state of
+          [] -> (Nothing, [])
+          arg : args -> (Just arg, args)
+  State.put state{testArgs = rest}
+  pure mArg
+
+popRemainingArgs :: ConvertTestM [LPat GhcPs]
+popRemainingArgs = do
+  state@ConvertTestState{testArgs} <- State.get
+  State.put state{testArgs = []}
+  pure testArgs
+
+{----- Test module converter monad -----}
+
+type ConvertTestModuleM = State ConvertTestModuleState
+
+data ConvertTestModuleState = ConvertTestModuleState
   { lastSeenSig :: Maybe SigInfo
   , allTests :: Seq (LocatedN RdrName)
   }
@@ -348,26 +377,26 @@ data SigInfo = SigInfo
   -- ^ The type captured in the signature
   }
 
-runConvertTestM :: ConvertTestM a -> (a, [LocatedN RdrName])
-runConvertTestM m =
+runConvertTestModuleM :: ConvertTestModuleM a -> (a, [LocatedN RdrName])
+runConvertTestModuleM m =
   fmap (toList . allTests) . State.runState m $
-    ConvertTestState
+    ConvertTestModuleState
       { lastSeenSig = Nothing
       , allTests = Seq.Empty
       }
 
-getLastSeenSig :: ConvertTestM (Maybe SigInfo)
+getLastSeenSig :: ConvertTestModuleM (Maybe SigInfo)
 getLastSeenSig = do
-  state@ConvertTestState{lastSeenSig} <- State.get
+  state@ConvertTestModuleState{lastSeenSig} <- State.get
   State.put state{lastSeenSig = Nothing}
   pure lastSeenSig
 
-setLastSeenSig :: SigInfo -> ConvertTestM ()
+setLastSeenSig :: SigInfo -> ConvertTestModuleM ()
 setLastSeenSig info = State.modify' $ \state -> state{lastSeenSig = Just info}
 
-getNextTestName :: ConvertTestM (LocatedN RdrName)
+getNextTestName :: ConvertTestModuleM (LocatedN RdrName)
 getNextTestName = do
-  state@ConvertTestState{allTests} <- State.get
+  state@ConvertTestModuleState{allTests} <- State.get
   let nextTestName = mkLRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName

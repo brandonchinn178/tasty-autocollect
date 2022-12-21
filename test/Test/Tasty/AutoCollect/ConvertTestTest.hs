@@ -225,6 +225,15 @@ test =
     stdout @?~ hasSubstr "passed 100 tests"
 
 test =
+  testCase "test_prop where clause has args in scope" $
+    assertSuccess_ . runQCTest $
+      [ "test_prop :: Positive Int -> Bool"
+      , "test_prop \"test\" (Positive n) = n > zero"
+      , "  where"
+      , "    zero = n - n"
+      ]
+
+test =
   testCase "test_prop may omit type" $
     assertSuccess_ . runQCTest $
       [ "test_prop \"test\" x = (x :: Int) === x"
