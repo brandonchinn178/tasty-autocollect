@@ -79,8 +79,7 @@ data TestModule = TestModule
   -- ^ The module name to display
   }
 
--- |
--- Find all test modules using the given path to the Main module.
+-- | Find all test modules using the given path to the Main module.
 --
 -- >>> findTestModules "test/Main.hs"
 -- ["My.Module.Test1", "My.Module.Test2", ...]

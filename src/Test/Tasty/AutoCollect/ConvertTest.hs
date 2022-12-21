@@ -36,8 +36,7 @@ plugin =
           pure $ withParsedResultModule result (transformTestModule names)
       }
 
--- |
--- Transforms a test module of the form
+-- | Transforms a test module of the form
 --
 -- @
 -- {\- AUTOCOLLECT.TEST -\}
@@ -100,8 +99,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
         mkExprTypeSig testsList . genLoc $
           HsListTy noAnn (getListOfTestTreeType names)
 
--- |
--- If the given declaration is a test, return the converted test, or otherwise
+-- | If the given declaration is a test, return the converted test, or otherwise
 -- return it unmodified
 convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
 convertTest names ldecl =

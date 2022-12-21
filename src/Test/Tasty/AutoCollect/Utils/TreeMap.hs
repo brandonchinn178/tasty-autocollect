@@ -16,8 +16,7 @@ data TreeMap k v = TreeMap
   }
   deriving (Show, Eq)
 
--- |
--- Convert the given list of values into a 'TreeMap'.
+-- | Convert the given list of values into a 'TreeMap'.
 --
 -- For example,
 -- @
