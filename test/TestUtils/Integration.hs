@@ -129,11 +129,10 @@ runghc GHCProject{..} =
 
 {----- Helpers -----}
 
-{- |
-Run a test file with tasty-autocollect.
-
-Automatically imports Test.Tasty and Test.Tasty.HUnit.
--}
+-- |
+-- Run a test file with tasty-autocollect.
+--
+-- Automatically imports Test.Tasty and Test.Tasty.HUnit.
 runTest :: FileContents -> IO (ExitCode, Text, Text)
 runTest = runTestWith id
 

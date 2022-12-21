@@ -29,11 +29,10 @@ parseModuleType = go . groupWhitespace
       | isTestComment (Text.unpack x) = Just ModuleTest
     go (_ : rest) = go rest
 
-{- |
-Group consecutive whitespace characters.
-
->>> groupWhitespace " a  bb  c "
-[" ", "a", "  ", "bb", "  ", "c", " "]
--}
+-- |
+-- Group consecutive whitespace characters.
+--
+-- >>> groupWhitespace " a  bb  c "
+-- [" ", "a", "  ", "bb", "  ", "c", " "]
 groupWhitespace :: Text -> [Text]
 groupWhitespace = Text.groupBy (\c1 c2 -> isSpace c1 == isSpace c2)

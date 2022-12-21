@@ -16,49 +16,48 @@ data TreeMap k v = TreeMap
   }
   deriving (Show, Eq)
 
-{- |
-Convert the given list of values into a 'TreeMap'.
-
-For example,
-@
-fromList [[A, B, C], [A, B], [A, C, D], [Z]]
-@
-would become
-@
-TreeMap
-  { value = Nothing
-  , children = Map.fromList
-      [ ("A", TreeMap
-          { value = Nothing
-          , children = Map.fromList
-              [ ("B", TreeMap
-                  { value = Just ...
-                  , children = Map.fromList
-                      ("C", [ TreeMap
-                          { value = Just ...
-                          , children = Map.empty
-                          }
-                      ])
-                  })
-              , ("C", TreeMap
-                  { value = Nothing
-                  , children = Map.fromList
-                      [ ("D", TreeMap
-                          { value = Just ...
-                          , children = Map.empty
-                          })
-                      ]
-                  })
-              ]
-          })
-    , ("Z", TreeMap
-        { value = Just ...
-        , children = Map.empty
-        })
-    ]
-  }
-@
--}
+-- |
+-- Convert the given list of values into a 'TreeMap'.
+--
+-- For example,
+-- @
+-- fromList [[A, B, C], [A, B], [A, C, D], [Z]]
+-- @
+-- would become
+-- @
+-- TreeMap
+--   { value = Nothing
+--   , children = Map.fromList
+--       [ ("A", TreeMap
+--           { value = Nothing
+--           , children = Map.fromList
+--               [ ("B", TreeMap
+--                   { value = Just ...
+--                   , children = Map.fromList
+--                       ("C", [ TreeMap
+--                           { value = Just ...
+--                           , children = Map.empty
+--                           }
+--                       ])
+--                   })
+--               , ("C", TreeMap
+--                   { value = Nothing
+--                   , children = Map.fromList
+--                       [ ("D", TreeMap
+--                           { value = Just ...
+--                           , children = Map.empty
+--                           })
+--                       ]
+--                   })
+--               ]
+--           })
+--     , ("Z", TreeMap
+--         { value = Just ...
+--         , children = Map.empty
+--         })
+--     ]
+--   }
+-- @
 fromList :: Ord k => [([k], v)] -> TreeMap k v
 fromList = foldr (uncurry insert) empty
 

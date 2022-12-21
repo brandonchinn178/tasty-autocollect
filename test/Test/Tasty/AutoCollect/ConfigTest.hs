@@ -131,12 +131,11 @@ test_prop "parseConfig errors on unknown keys" (ConfigPiece k) (ConfigPiece v) =
 
 {----- Helpers -----}
 
-{- |
-A Text suitable for use as a key or value in the configuration.
-
-Specifically, will be a non-empty string that does not contain '=',
-newlines, or trailing/leading spaces.
--}
+-- |
+-- A Text suitable for use as a key or value in the configuration.
+--
+-- Specifically, will be a non-empty string that does not contain '=',
+-- newlines, or trailing/leading spaces.
 newtype ConfigPiece = ConfigPiece {getConfigPiece :: Text}
   deriving (Show)
 

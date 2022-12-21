@@ -9,14 +9,13 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Test.Predicates
 
-{- |
-A predicate for checking that the given lines of text
-contain a line that, when stripped of whitespace, satisfies
-the given predicate.
-
-Writing our own because explainable-predicate's `contain`
-function doesn't provide a good output on failure.
--}
+-- |
+-- A predicate for checking that the given lines of text
+-- contain a line that, when stripped of whitespace, satisfies
+-- the given predicate.
+--
+-- Writing our own because explainable-predicate's `contain`
+-- function doesn't provide a good output on failure.
 containsStripped :: Predicate Text -> Predicate [Text]
 containsStripped p =
   Predicate
