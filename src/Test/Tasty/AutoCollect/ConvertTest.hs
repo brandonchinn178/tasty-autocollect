@@ -68,7 +68,7 @@ transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
     updateModule modl =
-      let (decls, testNames) = runConvertTestM $ concatMapM (convertTest names) $ hsmodDecls modl
+      let (decls, testNames) = runConvertTestModuleM $ concatMapM (convertTest names) $ hsmodDecls modl
        in modl
             { hsmodExports = updateExports <$> hsmodExports modl
             , hsmodDecls = mkTestsList testNames ++ decls
@@ -101,7 +101,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 
 -- | If the given declaration is a test, return the converted test, or otherwise
 -- return it unmodified
-convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
+convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestModuleM [LHsDecl GhcPs]
 convertTest names ldecl =
   case parseDecl ldecl of
     Just (FuncSig [funcName] ty)
@@ -330,11 +330,11 @@ withTestModifier names modifier loc args f =
     -- mapAllTests f e = [| map $f $e |]
     mapAllTests func expr = applyName (name_map names) [func, expr]
 
-{----- Test converter monad -----}
+{----- Test module converter monad -----}
 
-type ConvertTestM = State ConvertTestState
+type ConvertTestModuleM = State ConvertTestModuleState
 
-data ConvertTestState = ConvertTestState
+data ConvertTestModuleState = ConvertTestModuleState
   { lastSeenSig :: Maybe SigInfo
   , allTests :: Seq (LocatedN RdrName)
   }
@@ -348,26 +348,26 @@ data SigInfo = SigInfo
   -- ^ The type captured in the signature
   }
 
-runConvertTestM :: ConvertTestM a -> (a, [LocatedN RdrName])
-runConvertTestM m =
+runConvertTestModuleM :: ConvertTestModuleM a -> (a, [LocatedN RdrName])
+runConvertTestModuleM m =
   fmap (toList . allTests) . State.runState m $
-    ConvertTestState
+    ConvertTestModuleState
       { lastSeenSig = Nothing
       , allTests = Seq.Empty
       }
 
-getLastSeenSig :: ConvertTestM (Maybe SigInfo)
+getLastSeenSig :: ConvertTestModuleM (Maybe SigInfo)
 getLastSeenSig = do
-  state@ConvertTestState{lastSeenSig} <- State.get
+  state@ConvertTestModuleState{lastSeenSig} <- State.get
   State.put state{lastSeenSig = Nothing}
   pure lastSeenSig
 
-setLastSeenSig :: SigInfo -> ConvertTestM ()
+setLastSeenSig :: SigInfo -> ConvertTestModuleM ()
 setLastSeenSig info = State.modify' $ \state -> state{lastSeenSig = Just info}
 
-getNextTestName :: ConvertTestM (LocatedN RdrName)
+getNextTestName :: ConvertTestModuleM (LocatedN RdrName)
 getNextTestName = do
-  state@ConvertTestState{allTests} <- State.get
+  state@ConvertTestModuleState{allTests} <- State.get
   let nextTestName = mkLRdrName $ testIdentifier (length allTests)
   State.put state{allTests = allTests Seq.|> nextTestName}
   pure nextTestName
