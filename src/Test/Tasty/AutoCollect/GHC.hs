@@ -104,8 +104,8 @@ firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 getSpanLine :: SrcSpan -> String
 getSpanLine loc =
   case srcSpanStart loc of
-    Right srcLoc -> "line " ++ show (srcLocLine srcLoc)
-    Left s -> s
+    RealSrcLoc srcLoc _ -> "line " ++ show (srcLocLine srcLoc)
+    UnhelpfulLoc s -> unpackFS s
 
 {----- Name utilities -----}
 

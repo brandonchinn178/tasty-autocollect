@@ -17,9 +17,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
   generatedSrcAnn,
   toSrcAnnA,
 
-  -- ** SrcSpan
-  srcSpanStart,
-
   -- ** OccName
   mkOccNameVar,
   mkOccNameTC,
@@ -53,7 +50,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
 import GHC.Driver.Main as X (getHscEnv)
 import GHC.Hs as X hiding (mkHsAppType, mkHsAppTypes, mkMatch)
 import GHC.Parser.Annotation as X (AnnotationComment (..))
-import GHC.Plugins as X hiding (getHscEnv, mkLet, showPpr, srcSpanStart, varName)
+import GHC.Plugins as X hiding (getHscEnv, mkLet, showPpr, varName)
 import GHC.Types.Name.Cache as X (NameCache)
 
 import Data.IORef (IORef)
@@ -61,7 +58,6 @@ import qualified Data.Text as Text
 import qualified GHC.Hs.Utils as GHC (mkMatch)
 import GHC.Parser.Annotation (getAnnotationComments)
 import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
-import qualified GHC.Types.SrcLoc as GHC (srcSpanStart)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
@@ -104,14 +100,6 @@ generatedSrcAnn = generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpan
 toSrcAnnA x = RealSrcSpan x Nothing
-
-{----- Compat / SrcSpan -----}
-
-srcSpanStart :: SrcSpan -> Either String RealSrcLoc
-srcSpanStart ss =
-  case GHC.srcSpanStart ss of
-    RealSrcLoc srcLoc _ -> Right srcLoc
-    UnhelpfulLoc s -> Left $ unpackFS s
 
 {----- Compat / OccName -----}
 
