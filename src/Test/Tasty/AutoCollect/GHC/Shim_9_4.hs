@@ -18,10 +18,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
   getExportComments,
   toSrcAnnA,
 
-  -- ** OccName
-  mkOccNameVar,
-  mkOccNameTC,
-
   -- ** Decl
   parseDecl,
 
@@ -57,7 +53,6 @@ import GHC.Types.Name.Cache as X (NameCache)
 import qualified Data.Text as Text
 import qualified GHC.Data.Strict as Strict
 import qualified GHC.Plugins as GHC (thNameToGhcNameIO)
-import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
@@ -98,14 +93,6 @@ generatedSrcAnn = SrcSpanAnn noAnn generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
 toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Strict.Nothing)
-
-{----- Compat / OccName -----}
-
-mkOccNameVar :: String -> OccName
-mkOccNameVar = mkOccName NameSpace.varName
-
-mkOccNameTC :: String -> OccName
-mkOccNameTC = mkOccName NameSpace.tcName
 
 {----- Compat / Decl -----}
 

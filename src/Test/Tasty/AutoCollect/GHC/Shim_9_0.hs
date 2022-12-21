@@ -17,10 +17,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_0 (
   generatedSrcAnn,
   toSrcAnnA,
 
-  -- ** OccName
-  mkOccNameVar,
-  mkOccNameTC,
-
   -- ** Decl
   parseDecl,
 
@@ -57,7 +53,6 @@ import Data.IORef (IORef)
 import qualified Data.Text as Text
 import qualified GHC.Hs.Utils as GHC (mkMatch)
 import GHC.Parser.Annotation (getAnnotationComments)
-import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
@@ -100,14 +95,6 @@ generatedSrcAnn = generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpan
 toSrcAnnA x = RealSrcSpan x Nothing
-
-{----- Compat / OccName -----}
-
-mkOccNameVar :: String -> OccName
-mkOccNameVar = mkOccName NameSpace.varName
-
-mkOccNameTC :: String -> OccName
-mkOccNameTC = mkOccName NameSpace.tcName
 
 {----- Compat / Decl -----}
 
