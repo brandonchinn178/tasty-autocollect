@@ -61,24 +61,20 @@ library
       Test.Tasty.AutoCollect.GHC.Shim_Common
   hs-source-dirs:
       src
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   build-depends:
       base >=4.14 && <5
     , bytestring >=0.10 && <0.12
     , containers >=0.6.2.1 && <0.7
     , directory >=1.3.6.0 && <2
     , filepath >=1.4.2.1 && <2
-    , ghc >=8.10 && <9.5
+    , ghc >=9.0 && <9.5
     , tasty >=1.4.2.1 && <2
     , tasty-expected-failure >=0.11 && <1
     , template-haskell >=2.16 && <2.20
     , text >=1.2.3.2 && <3
     , transformers >=0.5.6.2 && <1
   default-language: Haskell2010
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
-  if impl(ghc < 8.8)
-    ghc-options: -Wnoncanonical-monadfail-instances
   if impl(ghc >= 9.4) && impl(ghc < 9.6)
     other-modules:
         Test.Tasty.AutoCollect.GHC.Shim_9_4
@@ -88,9 +84,6 @@ library
   if impl(ghc >= 9.0) && impl(ghc < 9.2)
     other-modules:
         Test.Tasty.AutoCollect.GHC.Shim_9_0
-  if impl(ghc >= 8.10) && impl(ghc < 9.0)
-    other-modules:
-        Test.Tasty.AutoCollect.GHC.Shim_8_10
 
 executable tasty-autocollect
   main-is: Preprocessor.hs
@@ -98,16 +91,12 @@ executable tasty-autocollect
       Paths_tasty_autocollect
   hs-source-dirs:
       exe
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   build-depends:
       base >=4.14 && <5
     , tasty-autocollect
     , text >=1.2.3.2 && <3
   default-language: Haskell2010
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
-  if impl(ghc < 8.8)
-    ghc-options: -Wnoncanonical-monadfail-instances
 
 test-suite tasty-autocollect-tests
   type: exitcode-stdio-1.0
@@ -127,7 +116,7 @@ test-suite tasty-autocollect-tests
       Paths_tasty_autocollect
   hs-source-dirs:
       test
-  ghc-options: -Wall -F -pgmF=tasty-autocollect
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances -F -pgmF=tasty-autocollect
   build-depends:
       base
     , bytestring
@@ -144,8 +133,4 @@ test-suite tasty-autocollect-tests
     , text
     , typed-process
   default-language: Haskell2010
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
-  if impl(ghc < 8.8)
-    ghc-options: -Wnoncanonical-monadfail-instances
   build-tool-depends: tasty-autocollect:tasty-autocollect
