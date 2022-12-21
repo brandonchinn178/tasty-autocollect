@@ -29,7 +29,7 @@ test = testGolden "test_todo fails when given arguments" "test_todo_args.golden"
     assertAnyFailure . runTest $
       [ "test_todo \"some name\" = \"a pending test\""
       ]
-  return stderr
+  pure stderr
 
 test = testGolden "test_todo fails when specifying wrong type" "test_todo_type.golden" $ do
   (_, stderr) <-
@@ -37,7 +37,7 @@ test = testGolden "test_todo fails when specifying wrong type" "test_todo_type.g
       [ "test_todo :: Int"
       , "test_todo = \"a pending test\""
       ]
-  return stderr
+  pure stderr
 
 test =
   testGolden "--fail-todos makes TODO tests fail" "fail_todos.golden" $ do
@@ -46,4 +46,4 @@ test =
         runTestWith
           (\proj -> proj{runArgs = ["--fail-todos"]})
           ["test_todo = \"a pending test\""]
-    return $ normalizeTestOutput stdout
+    pure $ normalizeTestOutput stdout

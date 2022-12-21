@@ -81,7 +81,7 @@ test_batch =
 test = testCase "tests fail when omitting export comment" $ do
   (_, stderr) <-
     assertAnyFailure . runTestWith (modifyFile "Test.hs" (map removeExports)) $
-      [ "test = testCase \"a test\" $ return ()"
+      [ "test = testCase \"a test\" $ pure ()"
       ]
   getTestLines stderr @?~ containsStripped (startsWith messagePreGHC94 `orP` startsWith messagePostGHC94)
   where
@@ -94,7 +94,7 @@ test = testCase "tests fail when omitting export comment" $ do
 test = testCase "test file can omit an explicit export list" $ do
   (stdout, _) <-
     assertSuccess . runTestWith (modifyFile "Test.hs" (map removeExports)) $
-      [ "test = testCase \"a test\" $ return ()"
+      [ "test = testCase \"a test\" $ pure ()"
       ]
   getTestLines stdout @?~ containsStripped (eq "a test: OK")
   where
@@ -127,30 +127,30 @@ test =
   testCase "test may specify type" $
     assertSuccess_ . runTest $
       [ "test :: TestTree"
-      , "test = testCase \"a test\" $ return ()"
+      , "test = testCase \"a test\" $ pure ()"
       ]
 
 test = testGolden "test fails when given arguments" "test_args.golden" $ do
   (_, stderr) <-
     assertAnyFailure . runTest $
-      [ "test \"some name\" = testCase \"test\" $ return ()"
+      [ "test \"some name\" = testCase \"test\" $ pure ()"
       ]
-  return stderr
+  pure stderr
 
 test = testGolden "test fails when specifying wrong type" "test_type.golden" $ do
   (_, stderr) <-
     assertAnyFailure . runTest $
       [ "test :: Int"
-      , "test = testCase \"test\" $ return ()"
+      , "test = testCase \"test\" $ pure ()"
       ]
-  return stderr
+  pure stderr
 
 test = testCase "tests can omit type signatures" $ do
   (stdout, _) <-
     assertSuccess . runTest $
-      [ "test = testCase \"test 1\" $ return ()"
+      [ "test = testCase \"test 1\" $ pure ()"
       , ""
-      , "test = testCase \"test 2\" $ return ()"
+      , "test = testCase \"test 2\" $ pure ()"
       ]
   getTestLines stdout @?~ containsStripped (eq "test 1: OK")
   getTestLines stdout @?~ containsStripped (eq "test 2: OK")
@@ -159,9 +159,9 @@ test =
   testCase "tests may omit type after specifying a type prior" $
     assertSuccess_ . runQCTest $
       [ "test :: TestTree"
-      , "test = testCase \"test 1\" $ return ()"
+      , "test = testCase \"test 1\" $ pure ()"
       , ""
-      , "test = testCase \"test 2\" $ return ()"
+      , "test = testCase \"test 2\" $ pure ()"
       ]
 
 {----- test_batch -----}
@@ -170,7 +170,7 @@ test = testCase "test_batch generates multiple tests" $ do
   (stdout, _) <-
     assertSuccess . runTest $
       [ "test_batch ="
-      , "  [ testCase (\"test #\" ++ show x) $ return ()"
+      , "  [ testCase (\"test #\" ++ show x) $ pure ()"
       , "  | x <- [1 .. 5]"
       , "  ]"
       ]
@@ -181,7 +181,7 @@ test = testCase "test_batch includes where clause" $ do
   (stdout, _) <-
     assertSuccess . runTest $
       [ "test_batch ="
-      , "  [ testCase (label x) $ return ()"
+      , "  [ testCase (label x) $ pure ()"
       , "  | x <- [1 .. 5]"
       , "  ]"
       , "  where"
@@ -202,7 +202,7 @@ test = testGolden "test_batch fails when given arguments" "test_batch_args.golde
     assertAnyFailure . runTest $
       [ "test_batch \"some name\" = []"
       ]
-  return stderr
+  pure stderr
 
 test = testGolden "test_batch fails when specifying wrong type" "test_batch_type.golden" $ do
   (_, stderr) <-
@@ -210,7 +210,7 @@ test = testGolden "test_batch fails when specifying wrong type" "test_batch_type
       [ "test_batch :: TestTree"
       , "test_batch = []"
       ]
-  return stderr
+  pure stderr
 
 {----- test_prop -----}
 
@@ -254,12 +254,12 @@ test =
 test =
   testGolden "test_prop fails when no arguments provided" "test_prop_no_args.golden" $ do
     (_, stderr) <- assertAnyFailure $ runTest ["test_prop = 1 === 1"]
-    return stderr
+    pure stderr
 
 test =
   testGolden "test_prop fails when non-string argument provided" "test_prop_bad_arg.golden" $ do
     (_, stderr) <- assertAnyFailure $ runTest ["test_prop 11 = True"]
-    return stderr
+    pure stderr
 
 test =
   testCase "test_prop works when -XOverloadedStrings is enabled" $
@@ -285,7 +285,7 @@ test =
       assertSuccess . runTest $
         [ "test_expectFail = testCase \"failing test\" $ 1 @?= 2"
         ]
-    return (normalizeTestOutput stdout)
+    pure (normalizeTestOutput stdout)
 
 test =
   testGolden "expectFailBecause succeeds when test fails" "test_expectFailBecause_output.golden" $ do
@@ -293,7 +293,7 @@ test =
       assertSuccess . runTest $
         [ "test_expectFailBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
         ]
-    return (normalizeTestOutput stdout)
+    pure (normalizeTestOutput stdout)
 
 test =
   testGolden "ignoreTest succeeds when test fails" "test_ignoreTest_output.golden" $ do
@@ -301,7 +301,7 @@ test =
       assertSuccess . runTest $
         [ "test_ignoreTest = testCase \"failing test\" $ 1 @?= 2"
         ]
-    return (normalizeTestOutput stdout)
+    pure (normalizeTestOutput stdout)
 
 test =
   testGolden "ignoreTestBecause succeeds when test fails" "test_ignoreTestBecause_output.golden" $ do
@@ -309,7 +309,7 @@ test =
       assertSuccess . runTest $
         [ "test_ignoreTestBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
         ]
-    return (normalizeTestOutput stdout)
+    pure (normalizeTestOutput stdout)
 
 test =
   testGolden "expected-failure modifiers work on test_batch" "test_batch_expectFailBecause_output.golden" $ do
@@ -320,7 +320,7 @@ test =
         , "  | x <- [1 .. 3 :: Int]"
         , "  ]"
         ]
-    return (normalizeTestOutput stdout)
+    pure (normalizeTestOutput stdout)
 
 test =
   testCase "expected-failure modifiers work on test_prop" $ do

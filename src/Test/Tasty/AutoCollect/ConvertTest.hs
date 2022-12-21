@@ -162,7 +162,7 @@ convertTest names ldecl =
         TestProp -> do
           (name, remainingPats) <-
             case args of
-              arg : rest | Just s <- parseLitStrPat arg -> return (s, rest)
+              arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
                 autocollectError . unlines $

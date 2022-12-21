@@ -49,7 +49,7 @@ assertStatus :: (ExitCode -> Bool) -> IO (ExitCode, Text, Text) -> IO (Text, Tex
 assertStatus isExpected testResult = do
   (code, stdout, stderr) <- testResult
   if isExpected code
-    then return (stdout, stderr)
+    then pure (stdout, stderr)
     else
       errorWithoutStackTrace . unlines $
         [ "Got: " ++ show code
@@ -123,7 +123,7 @@ runghc GHCProject{..} =
           , "--" : entrypoint : map Text.unpack runArgs
           ]
 
-    return (code, decode stdout, decode stderr)
+    pure (code, decode stdout, decode stderr)
   where
     decode = TextL.toStrict . TextL.decodeUtf8
 
