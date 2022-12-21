@@ -35,7 +35,7 @@ test = testCase "searches recursively" $ do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module A.B.C.X.Y.Z where"
       , "import Test.Tasty.HUnit"
-      , "test = testCase \"test\" $ return ()"
+      , "test = testCase \"test\" $ pure ()"
       ]
 
 test =
@@ -77,8 +77,8 @@ test_batch =
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test = testCase \"test #1 for " <> ident <> "\" $ return ()"
-      , "test = testCase \"test #2 for " <> ident <> "\" $ return ()"
+      , "test = testCase \"test #1 for " <> ident <> "\" $ pure ()"
+      , "test = testCase \"test #2 for " <> ident <> "\" $ pure ()"
       ]
 
 test = testCase "generateMain orders test modules alphabetically" $ do
@@ -114,7 +114,7 @@ test = testCase "generateMain orders test modules alphabetically" $ do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test = testCase \"test\" $ return ()"
+      , "test = testCase \"test\" $ pure ()"
       ]
 
 test = testCase "allows stripping suffix from test modules" $ do
@@ -142,7 +142,7 @@ test = testCase "allows stripping suffix from test modules" $ do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test = testCase \"test\" $ return ()"
+      , "test = testCase \"test\" $ pure ()"
       ]
 
 test = testCase "suffix is stripped before building module tree" $ do
@@ -171,7 +171,7 @@ test = testCase "suffix is stripped before building module tree" $ do
           [ "{- AUTOCOLLECT.TEST -}"
           , "module A.B.CTest where"
           , "import Test.Tasty.HUnit"
-          , "test = testCase \"test1\" $ return ()"
+          , "test = testCase \"test1\" $ pure ()"
           ]
         )
       ,
@@ -180,7 +180,7 @@ test = testCase "suffix is stripped before building module tree" $ do
           [ "{- AUTOCOLLECT.TEST -}"
           , "module A.B.C.DTest where"
           , "import Test.Tasty.HUnit"
-          , "test = testCase \"test2\" $ return ()"
+          , "test = testCase \"test2\" $ pure ()"
           ]
         )
       ]
@@ -199,7 +199,7 @@ test = testCase "allows adding extra ingredients" $ do
       , "import Test.Tasty.Ingredients"
       , "sayHelloAndExit :: Ingredient"
       , "sayHelloAndExit = TestManager [] $ \\_ _ -> Just $"
-      , "  putStrLn \"Hello!\" >> return True"
+      , "  putStrLn \"Hello!\" >> pure True"
       ]
 
 test = testCase "gives informative error when ingredient lacks module" $ do
@@ -269,7 +269,7 @@ test = testCase "allows customizing main module" $ do
       [ "{- AUTOCOLLECT.TEST -}"
       , "module " <> moduleName <> " where"
       , "import Test.Tasty.HUnit"
-      , "test = testCase \"test\" $ return ()"
+      , "test = testCase \"test\" $ pure ()"
       ]
 
 {----- Helpers -----}
@@ -307,6 +307,6 @@ runMainWith f mainFile =
         , "import Test.Tasty"
         , "import Test.Tasty.HUnit"
         , ""
-        , "test = testCase \"a test in " <> moduleName <> "\" $ return ()"
+        , "test = testCase \"a test in " <> moduleName <> "\" $ pure ()"
         ]
       )

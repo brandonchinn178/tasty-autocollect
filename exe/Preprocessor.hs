@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-{- |
+{-|
 A preprocessor that registers tasty-autocollect in a test suite.
 
 We need to use a preprocessor for Main.hs because GHC plugins don't

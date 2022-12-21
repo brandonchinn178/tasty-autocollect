@@ -76,8 +76,8 @@ Design goals:
 
     test =
       testGroup "manually defining a test group"
-        [ testCase "some test" $ return ()
-        , testCase "some other test" $ return ()
+        [ testCase "some test" $ pure ()
+        , testCase "some other test" $ pure ()
         ]
     ```
 
@@ -195,7 +195,7 @@ With `tasty-autocollect`, you can write a set of tests in one definition without
 
 ```hs
 test_batch =
-  [ testCase ("test #" ++ show x) $ return ()
+  [ testCase ("test #" ++ show x) $ pure ()
   | x <- [1, 5, 10 :: Int]
   ]
 ```
@@ -203,11 +203,11 @@ test_batch =
 is equivalent to writing:
 
 ```hs
-test = testCase "test #1" $ return ()
+test = testCase "test #1" $ pure ()
 
-test = testCase "test #5" $ return ()
+test = testCase "test #5" $ pure ()
 
-test = testCase "test #10" $ return ()
+test = testCase "test #10" $ pure ()
 ```
 
 ### Integration with `tasty-expected-failures`

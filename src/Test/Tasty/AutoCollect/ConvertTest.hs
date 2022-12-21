@@ -36,36 +36,34 @@ plugin =
           pure $ withParsedResultModule result (transformTestModule names)
       }
 
-{- |
-Transforms a test module of the form
-
-@
-{\- AUTOCOLLECT.TEST -\}
-module MyTest (
-  foo,
-  {\- AUTOCOLLECT.TEST.export -\}
-  bar,
-) where
-
-test = ...
-@
-
-to the equivalent of
-
-@
-module MyTest (
-  foo,
-  tasty_tests,
-  bar,
-) where
-
-tasty_tests :: [TestTree]
-tasty_tests = [tasty_test_1]
-
-tasty_test_1 :: TestTree
-tasty_test_1 = ...
-@
--}
+-- | Transforms a test module of the form
+--
+-- @
+-- {\- AUTOCOLLECT.TEST -\}
+-- module MyTest (
+--   foo,
+--   {\- AUTOCOLLECT.TEST.export -\}
+--   bar,
+-- ) where
+--
+-- test = ...
+-- @
+--
+-- to the equivalent of
+--
+-- @
+-- module MyTest (
+--   foo,
+--   tasty_tests,
+--   bar,
+-- ) where
+--
+-- tasty_tests :: [TestTree]
+-- tasty_tests = [tasty_test_1]
+--
+-- tasty_test_1 :: TestTree
+-- tasty_test_1 = ...
+-- @
 transformTestModule :: ExternalNames -> HsParsedModule -> HsParsedModule
 transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> hpm_module parsedModl}
   where
@@ -101,10 +99,8 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
         mkExprTypeSig testsList . genLoc $
           HsListTy noAnn (getListOfTestTreeType names)
 
-{- |
-If the given declaration is a test, return the converted test, or otherwise
-return it unmodified
--}
+-- | If the given declaration is a test, return the converted test, or otherwise
+-- return it unmodified
 convertTest :: ExternalNames -> LHsDecl GhcPs -> ConvertTestM [LHsDecl GhcPs]
 convertTest names ldecl =
   case parseDecl ldecl of
@@ -166,7 +162,7 @@ convertTest names ldecl =
         TestProp -> do
           (name, remainingPats) <-
             case args of
-              arg : rest | Just s <- parseLitStrPat arg -> return (s, rest)
+              arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
                 autocollectError . unlines $
@@ -297,12 +293,12 @@ isTypeVarNamed name = \case
 
 withTestModifier ::
   Monad m =>
-  ExternalNames ->
-  TestModifier ->
-  SrcSpan ->
-  [LPat GhcPs] ->
-  ([LPat GhcPs] -> m (LHsExpr GhcPs)) ->
-  m (LHsExpr GhcPs)
+  ExternalNames
+  -> TestModifier
+  -> SrcSpan
+  -> [LPat GhcPs]
+  -> ([LPat GhcPs] -> m (LHsExpr GhcPs))
+  -> m (LHsExpr GhcPs)
 withTestModifier names modifier loc args f =
   case modifier of
     ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
