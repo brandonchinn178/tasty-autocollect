@@ -1,6 +1,6 @@
 # tasty-autocollect
 
-[![](https://img.shields.io/github/workflow/status/brandonchinn178/tasty-autocollect/CI/main)](https://github.com/brandonchinn178/tasty-autocollect/actions)
+[![](https://img.shields.io/github/actions/workflow/status/brandonchinn178/tasty-autocollect/ci.yml?branch=main)](https://github.com/brandonchinn178/tasty-autocollect/actions)
 [![](https://img.shields.io/codecov/c/gh/brandonchinn178/tasty-autocollect)](https://app.codecov.io/gh/brandonchinn178/tasty-autocollect)
 [![](https://img.shields.io/hackage/v/tasty-autocollect)](https://hackage.haskell.org/package/tasty-autocollect)
 
