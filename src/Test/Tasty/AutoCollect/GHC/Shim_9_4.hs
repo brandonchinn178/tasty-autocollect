@@ -35,6 +35,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
   -- ** Expr
   mkExplicitList,
   mkExplicitTuple,
+  mkLet,
   xAppTypeE,
 
   -- * Backports
@@ -48,6 +49,7 @@ import GHC.Plugins as X hiding (
   AnnBind (..),
   AnnExpr' (..),
   getHscEnv,
+  mkLet,
   msg,
   showPpr,
   srcSpanStart,
@@ -156,6 +158,9 @@ mkExplicitList = ExplicitList noAnn
 
 mkExplicitTuple :: [HsTupArg GhcPs] -> Boxity -> HsExpr GhcPs
 mkExplicitTuple = ExplicitTuple noAnn
+
+mkLet :: HsLocalBinds GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
+mkLet binds expr = HsLet noAnn (L NoTokenLoc HsTok) binds (L NoTokenLoc HsTok) expr
 
 xAppTypeE :: XAppTypeE GhcPs
 xAppTypeE = generatedSrcSpan

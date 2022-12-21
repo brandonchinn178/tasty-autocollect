@@ -35,6 +35,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
   -- ** Expr
   mkExplicitList,
   mkExplicitTuple,
+  mkLet,
   xAppTypeE,
 
   -- * Backports
@@ -55,7 +56,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_8_10 (
 -- Re-exports
 import ApiAnnotation as X (AnnotationComment (..))
 import GHC.Hs as X hiding (mkHsAppType, mkHsAppTypes, mkMatch)
-import GhcPlugins as X hiding (getHscEnv, getLoc, showPpr, srcSpanStart, unLoc)
+import GhcPlugins as X hiding (getHscEnv, getLoc, mkLet, showPpr, srcSpanStart, unLoc)
 import HscMain as X (getHscEnv)
 import NameCache as X (NameCache)
 
@@ -175,6 +176,9 @@ mkExplicitList = ExplicitList noExtField Nothing
 
 mkExplicitTuple :: [HsTupArg GhcPs] -> Boxity -> HsExpr GhcPs
 mkExplicitTuple = ExplicitTuple noAnn . map (L generatedSrcAnn)
+
+mkLet :: HsLocalBinds GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
+mkLet binds expr = HsLet noExtField (L generatedSrcAnn binds) expr
 
 xAppTypeE :: XAppTypeE GhcPs
 xAppTypeE = noExtField

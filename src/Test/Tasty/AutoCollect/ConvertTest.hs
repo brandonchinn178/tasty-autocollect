@@ -138,13 +138,14 @@ convertTest names ldecl =
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      (testBody, _) <-
+      (testBody, ConvertTestState{mWhereClause}) <-
         case funcDefGuards of
           [FuncGuardedBody [] body] -> do
             let state =
                   ConvertTestState
                     { mSigType
                     , testArgs = funcDefArgs
+                    , mWhereClause = Just funcDefWhereClause
                     }
             pure . runConvertTestM state $ do
               testBody <- convertSingleTestBody testType body
@@ -162,7 +163,7 @@ convertTest names ldecl =
         [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
-        , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
+        , [genFuncDecl testName [] testBody mWhereClause <$ ldecl]
         ]
 
     convertSingleTestBody testType body =
@@ -170,7 +171,14 @@ convertTest names ldecl =
         TestNormal ->
           pure $ singleExpr body
         TestProp -> do
-          ConvertTestState{mSigType} <- State.get
+          -- test_prop :: <type>
+          -- test_prop "name" arg1 arg2 = <body> where <defs>
+          -- ====>
+          -- test = testProperty "name" ((\arg1 arg2 -> let <defs> in <body>) :: <type>)
+
+          state@ConvertTestState{mSigType, mWhereClause} <- State.get
+          State.put state{mSigType = Nothing, mWhereClause = Nothing}
+
           (name, remainingPats) <-
             popRemainingArgs >>= \case
               arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
@@ -180,7 +188,13 @@ convertTest names ldecl =
                   [ "test_prop expected a String for the name of the test."
                   , "Got: " ++ showPpr arg
                   ]
-          let propBody = mkHsLam remainingPats body
+
+          let propBody =
+                mkHsLam remainingPats $
+                  case mWhereClause of
+                    Just defs -> genLoc $ mkLet defs body
+                    Nothing -> body
+
           pure . singleExpr $
             mkHsApps
               (lhsvar $ mkLRdrName "testProperty")
@@ -322,6 +336,7 @@ type ConvertTestM = State ConvertTestState
 
 data ConvertTestState = ConvertTestState
   { mSigType :: Maybe (LHsSigWcType GhcPs)
+  , mWhereClause :: Maybe (HsLocalBinds GhcPs)
   , testArgs :: [LPat GhcPs]
   }
 
