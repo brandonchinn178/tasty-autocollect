@@ -138,9 +138,20 @@ convertTest names ldecl =
             | testType == testTypeFromSig -> pure (testName, Just signatureType)
             | otherwise -> autocollectError $ "Found test with different type of signature: " ++ show (testType, testTypeFromSig)
 
-      testBody <-
+      (testBody, _) <-
         case funcDefGuards of
-          [FuncGuardedBody [] body] -> convertSingleTestBody testType mSigType funcDefArgs body
+          [FuncGuardedBody [] body] -> do
+            let state =
+                  ConvertTestState
+                    { mSigType
+                    , testArgs = funcDefArgs
+                    }
+            pure . runConvertTestM state $ do
+              testBody <- convertSingleTestBody testType body
+              State.gets testArgs >>= \case
+                [] -> pure ()
+                _ -> autocollectError $ "Found extraneous arguments at " ++ getSpanLine loc
+              pure testBody
           _ ->
             autocollectError . unlines $
               [ "Test should have no guards."
@@ -154,14 +165,14 @@ convertTest names ldecl =
         , [genFuncDecl testName [] testBody (Just funcDefWhereClause) <$ ldecl]
         ]
 
-    convertSingleTestBody testType mSigType args body =
+    convertSingleTestBody testType body =
       case testType of
-        TestNormal -> do
-          checkNoArgs testType args
+        TestNormal ->
           pure $ singleExpr body
         TestProp -> do
+          ConvertTestState{mSigType} <- State.get
           (name, remainingPats) <-
-            case args of
+            popRemainingArgs >>= \case
               arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
               [] -> autocollectError "test_prop requires at least the name of the test"
               arg : _ ->
@@ -176,27 +187,18 @@ convertTest names ldecl =
               [ mkHsLitString name
               , maybe propBody (genLoc . ExprWithTySig noAnn propBody) mSigType
               ]
-        TestTodo -> do
-          checkNoArgs testType args
+        TestTodo ->
           pure . singleExpr $
             mkHsApp
               (mkHsVar $ name_testTreeTodo names)
               (mkExprTypeSig body $ mkHsTyVar (name_String names))
-        TestBatch -> do
-          checkNoArgs testType args
+        TestBatch ->
           pure body
         TestModify modifier testType' ->
-          withTestModifier names modifier loc args $ \args' ->
-            convertSingleTestBody testType' mSigType args' body
+          withTestModifier names modifier loc $
+            convertSingleTestBody testType' body
 
     singleExpr = genLoc . mkExplicitList . (: [])
-
-    checkNoArgs testType args =
-      unless (null args) $
-        autocollectError . unwords $
-          [ showTestType testType ++ " should not be used with arguments"
-          , "(at " ++ getSpanLine loc ++ ")"
-          ]
 
 -- | Identifier for the generated `tests` list.
 testListName :: LocatedN RdrName
@@ -239,20 +241,6 @@ parseTestType = go . Text.splitOn "_" . Text.pack
 
     unsnoc = fmap (NonEmpty.init &&& NonEmpty.last) . NonEmpty.nonEmpty
 
-showTestType :: TestType -> String
-showTestType = \case
-  TestNormal -> "test"
-  TestProp -> "test_prop"
-  TestTodo -> "test_todo"
-  TestBatch -> "test_batch"
-  TestModify modifier tt -> showTestType tt ++ showModifier modifier
-  where
-    showModifier = \case
-      ExpectFail -> "_expectFail"
-      ExpectFailBecause -> "_expectFailBecause"
-      IgnoreTest -> "_ignoreTest"
-      IgnoreTestBecause -> "_ignoreTestBecause"
-
 isValidForTestType :: ExternalNames -> TestType -> LHsSigWcType GhcPs -> Bool
 isValidForTestType names = \case
   TestNormal -> parsedTypeMatches isTestTreeTypeVar
@@ -292,36 +280,34 @@ isTypeVarNamed name = \case
   _ -> False
 
 withTestModifier ::
-  Monad m =>
   ExternalNames
   -> TestModifier
   -> SrcSpan
-  -> [LPat GhcPs]
-  -> ([LPat GhcPs] -> m (LHsExpr GhcPs))
-  -> m (LHsExpr GhcPs)
-withTestModifier names modifier loc args f =
+  -> ConvertTestM (LHsExpr GhcPs)
+  -> ConvertTestM (LHsExpr GhcPs)
+withTestModifier names modifier loc m =
   case modifier of
-    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> f args
+    ExpectFail -> mapAllTests (mkHsVar $ name_expectFail names) <$> m
     ExpectFailBecause ->
-      case args of
-        arg : rest
+      popArg >>= \case
+        Just arg
           | Just s <- parseLitStrPat arg ->
-              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> f rest
-        _ -> needsStrArg "_expectFailBecause"
-    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> f args
+              mapAllTests (applyName (name_expectFailBecause names) [mkHsLitString s]) <$> m
+        mArg -> needsStrArg mArg "_expectFailBecause"
+    IgnoreTest -> mapAllTests (mkHsVar $ name_ignoreTest names) <$> m
     IgnoreTestBecause ->
-      case args of
-        arg : rest
+      popArg >>= \case
+        Just arg
           | Just s <- parseLitStrPat arg ->
-              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> f rest
-        _ -> needsStrArg "_ignoreTestBecause"
+              mapAllTests (applyName (name_ignoreTestBecause names) [mkHsLitString s]) <$> m
+        mArg -> needsStrArg mArg "_ignoreTestBecause"
   where
-    needsStrArg label =
+    needsStrArg mArg label =
       autocollectError . unlines . concat $
         [ [label ++ " requires a String argument."]
-        , case args of
-            [] -> []
-            arg : _ -> ["Got: " ++ showPpr arg]
+        , case mArg of
+            Nothing -> []
+            Just arg -> ["Got: " ++ showPpr arg]
         , ["At: " ++ getSpanLine loc]
         ]
 
@@ -329,6 +315,34 @@ withTestModifier names modifier loc args f =
 
     -- mapAllTests f e = [| map $f $e |]
     mapAllTests func expr = applyName (name_map names) [func, expr]
+
+{----- Test function converter monad -----}
+
+type ConvertTestM = State ConvertTestState
+
+data ConvertTestState = ConvertTestState
+  { mSigType :: Maybe (LHsSigWcType GhcPs)
+  , testArgs :: [LPat GhcPs]
+  }
+
+runConvertTestM :: ConvertTestState -> ConvertTestM a -> (a, ConvertTestState)
+runConvertTestM = flip State.runState
+
+popArg :: ConvertTestM (Maybe (LPat GhcPs))
+popArg = do
+  state <- State.get
+  let (mArg, rest) =
+        case testArgs state of
+          [] -> (Nothing, [])
+          arg : args -> (Just arg, args)
+  State.put state{testArgs = rest}
+  pure mArg
+
+popRemainingArgs :: ConvertTestM [LPat GhcPs]
+popRemainingArgs = do
+  state@ConvertTestState{testArgs} <- State.get
+  State.put state{testArgs = []}
+  pure testArgs
 
 {----- Test module converter monad -----}
 
