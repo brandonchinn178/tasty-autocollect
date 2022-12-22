@@ -15,17 +15,12 @@ extra-source-files:
 
 github: brandonchinn178/tasty-autocollect
 
-ghc-options: -Wall
-when:
-  - condition: impl(ghc >= 8.0)
-    ghc-options:
-      - -Wcompat
-      - -Wincomplete-record-updates
-      - -Wincomplete-uni-patterns
-      - -Wnoncanonical-monad-instances
-  - condition: impl(ghc < 8.8)
-    ghc-options:
-      - -Wnoncanonical-monadfail-instances
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wnoncanonical-monad-instances
 
 library:
   source-dirs: src
@@ -43,16 +38,13 @@ library:
     - condition: impl(ghc >= 9.0) && impl(ghc < 9.2)
       other-modules:
         - Test.Tasty.AutoCollect.GHC.Shim_9_0
-    - condition: impl(ghc >= 8.10) && impl(ghc < 9.0)
-      other-modules:
-        - Test.Tasty.AutoCollect.GHC.Shim_8_10
   dependencies:
     - base >= 4.14 && < 5
     - bytestring >= 0.10 && < 0.12
     - containers >= 0.6.2.1 && < 0.7
     - directory >= 1.3.6.0 && < 2
     - filepath >= 1.4.2.1 && < 2
-    - ghc >= 8.10 && < 9.5
+    - ghc >= 9.0 && < 9.5
     - tasty >= 1.4.2.1 && < 2
     - tasty-expected-failure >= 0.11 && < 1
     - template-haskell >= 2.16 && < 2.20

@@ -36,6 +36,7 @@ module Test.Tasty.AutoCollect.GHC (
 import Data.Foldable (foldl')
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
 
 import Test.Tasty.AutoCollect.GHC.Shim
 
@@ -104,19 +105,19 @@ firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 getSpanLine :: SrcSpan -> String
 getSpanLine loc =
   case srcSpanStart loc of
-    Right srcLoc -> "line " ++ show (srcLocLine srcLoc)
-    Left s -> s
+    RealSrcLoc srcLoc _ -> "line " ++ show (srcLocLine srcLoc)
+    UnhelpfulLoc s -> unpackFS s
 
 {----- Name utilities -----}
 
 mkRdrName :: String -> RdrName
-mkRdrName = mkRdrUnqual . mkOccNameVar
+mkRdrName = mkRdrUnqual . mkOccName NameSpace.varName
 
 mkLRdrName :: String -> LocatedN RdrName
 mkLRdrName = genLoc . mkRdrName
 
 mkRdrNameType :: String -> RdrName
-mkRdrNameType = mkRdrUnqual . mkOccNameTC
+mkRdrNameType = mkRdrUnqual . mkOccName NameSpace.tcName
 
 mkLRdrNameType :: String -> LocatedN RdrName
 mkLRdrNameType = genLoc . mkRdrNameType

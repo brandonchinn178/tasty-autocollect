@@ -18,13 +18,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
   getExportComments,
   toSrcAnnA,
 
-  -- ** SrcSpan
-  srcSpanStart,
-
-  -- ** OccName
-  mkOccNameVar,
-  mkOccNameTC,
-
   -- ** Decl
   parseDecl,
 
@@ -52,7 +45,6 @@ import GHC.Plugins as X hiding (
   mkLet,
   msg,
   showPpr,
-  srcSpanStart,
   thNameToGhcNameIO,
   varName,
  )
@@ -61,8 +53,6 @@ import GHC.Types.Name.Cache as X (NameCache)
 import qualified Data.Text as Text
 import qualified GHC.Data.Strict as Strict
 import qualified GHC.Plugins as GHC (thNameToGhcNameIO)
-import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
-import qualified GHC.Types.SrcLoc as GHC (srcSpanStart)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
@@ -103,22 +93,6 @@ generatedSrcAnn = SrcSpanAnn noAnn generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
 toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Strict.Nothing)
-
-{----- Compat / SrcSpan -----}
-
-srcSpanStart :: SrcSpan -> Either String RealSrcLoc
-srcSpanStart ss =
-  case GHC.srcSpanStart ss of
-    RealSrcLoc srcLoc _ -> Right srcLoc
-    UnhelpfulLoc s -> Left $ unpackFS s
-
-{----- Compat / OccName -----}
-
-mkOccNameVar :: String -> OccName
-mkOccNameVar = mkOccName NameSpace.varName
-
-mkOccNameTC :: String -> OccName
-mkOccNameTC = mkOccName NameSpace.tcName
 
 {----- Compat / Decl -----}
 
