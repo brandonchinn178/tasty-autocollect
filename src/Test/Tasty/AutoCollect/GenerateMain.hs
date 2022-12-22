@@ -91,10 +91,11 @@ findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestMo
     toTestModule fp = do
       fileContentsBS <- ByteString.readFile fp
       pure $
-        case (splitExtensions fp, parseModuleType <$> Text.decodeUtf8' fileContentsBS) of
-          ((fpNoExt, ".hs"), Right (Just ModuleTest)) ->
-            let moduleName = Text.replace "/" "." . Text.pack . makeRelative testDir $ fpNoExt
-             in Just
+        case splitExtensions fp of
+          (fpNoExt, ".hs")
+            | Right (Just ModuleTest) <- parseModuleType <$> Text.decodeUtf8' fileContentsBS
+            , let moduleName = Text.replace "/" "." $ Text.pack (makeRelative testDir fpNoExt) ->
+                Just
                   TestModule
                     { moduleName
                     , displayName = withoutSuffix (cfgStripSuffix cfg) moduleName
