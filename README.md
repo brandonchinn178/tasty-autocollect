@@ -176,6 +176,9 @@ test_prop_expectFailBecause "Issue #123" "some property" x = x === x
 ```hs
 {- AUTOCOLLECT.MAIN
 suite_name = foo
+
+# comments can start with a hash symbol
+group_type = flat
 -}
 ```
 
