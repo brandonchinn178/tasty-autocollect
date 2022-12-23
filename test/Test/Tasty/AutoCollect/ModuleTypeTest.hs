@@ -36,6 +36,6 @@ test_prop "parseModuleType parses TEST case-insensitive" =
 
 test = testCase "parseModuleType parses configuration for main modules" $ do
   parseModuleType "{- AUTOCOLLECT.MAIN suite_name = foo -}"
-    @?~ just ($(qADT 'ModuleMain) $ cfgSuiteName `with` eq (Just "foo"))
+    @?~ just ($(qADT 'ModuleMain) $ cfgSuiteName `with` eq (Just $ Just "foo"))
   parseModuleType "{- AUTOCOLLECT.MAIN\nsuite_name = foo\n-}"
-    @?~ just ($(qADT 'ModuleMain) $ cfgSuiteName `with` eq (Just "foo"))
+    @?~ just ($(qADT 'ModuleMain) $ cfgSuiteName `with` eq (Just $ Just "foo"))

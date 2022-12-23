@@ -69,13 +69,13 @@ test_prop "parseConfig strips whitespace" (ConfigPiece v) kspaces vspaces =
 test_prop :: ConfigPiece -> Property
 test_prop "parseConfig parses suite_name" (ConfigPiece v) =
   parseConfig ("suite_name = " <> v)
-    `satisfies` right (cfgSuiteName `with` just (eq v))
+    `satisfies` right (cfgSuiteName `with` just (just (eq v)))
 
 test_prop :: Property
 test_prop "parseConfig parses group_type" =
   forAll (elements groupTypeOptions) $ \(groupTypeName, groupType) ->
     parseConfig ("group_type = " <> groupTypeName)
-      `satisfies` right (cfgGroupType `with` eq groupType)
+      `satisfies` right (cfgGroupType `with` just (eq groupType))
 
 test_prop :: ConfigPiece -> Property
 test_prop "parseConfig errors on invalid group_type" (ConfigPiece v) =
@@ -92,24 +92,24 @@ groupTypeOptions =
 test_prop :: ConfigPiece -> Property
 test_prop "parseConfig parses strip_suffix" (ConfigPiece v) =
   parseConfig ("strip_suffix = " <> v)
-    `satisfies` right (cfgStripSuffix `with` eq v)
+    `satisfies` right (cfgStripSuffix `with` just (eq v))
 
 test_prop :: NonEmptyList HsIdentifier -> Property
 test_prop "parseConfig parses ingredients" (NonEmpty (map getHsIdentifier -> ingredients)) =
   parseConfig ("ingredients = " <> Text.intercalate "," ingredients)
-    `satisfies` right (cfgIngredients `with` eq ingredients)
+    `satisfies` right (cfgIngredients `with` just (eq ingredients))
 
 test_prop :: NonEmptyList (HsIdentifier, Spaces) -> Property
 test_prop "parseConfig strips whitespace when parsing ingredients" (NonEmpty (map (first getHsIdentifier) -> identifiers)) =
   let ingredientsVal = Text.intercalate "," . map (\(s, spaces) -> wrapSpaces spaces s) $ identifiers
       ingredients = map fst identifiers
    in parseConfig ("ingredients = " <> ingredientsVal)
-        `satisfies` right (cfgIngredients `with` eq ingredients)
+        `satisfies` right (cfgIngredients `with` just (eq ingredients))
 
 test_prop :: BoolOption -> Property
 test_prop "parseConfig parses ingredients_override (case insensitive)" option =
   parseConfig ("ingredients_override = " <> getText option)
-    `satisfies` right (cfgIngredientsOverride `with` eq (getBool option))
+    `satisfies` right (cfgIngredientsOverride `with` just (eq (getBool option)))
 
 test_prop :: ConfigPiece -> Property
 test_prop "parseConfig errors on invalid ingredients_override" (ConfigPiece v) =

@@ -7,6 +7,7 @@ module Test.Tasty.AutoCollect (
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.GenerateMain
 import Test.Tasty.AutoCollect.ModuleType
 import Test.Tasty.AutoCollect.Utils.Text
@@ -15,7 +16,9 @@ import Test.Tasty.AutoCollect.Utils.Text
 processFile :: FilePath -> Text -> IO Text
 processFile path file =
   case parseModuleType file of
-    Just (ModuleMain cfg) -> addLinePragma <$> generateMainModule cfg path file
+    Just (ModuleMain cfg) -> do
+      cfg' <- resolveConfig cfg
+      addLinePragma <$> generateMainModule cfg' path file
     Just ModuleTest ->
       pure
         . addLine "{-# OPTIONS_GHC -fplugin=Test.Tasty.AutoCollect.ConvertTest #-}"

@@ -1,36 +1,57 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.Config (
-  AutoCollectConfig (..),
+  AutoCollectConfig' (..),
+  AutoCollectConfig,
+  AutoCollectConfigPartial,
   AutoCollectGroupType (..),
-  defaultConfig,
   parseConfig,
+  resolveConfig,
 ) where
 
+import Control.Applicative ((<|>))
+import Data.Functor.Identity (Identity)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 
 {----- Configuration -----}
 
+type family Apply f a where
+  Apply Maybe a = Maybe a
+  Apply Identity a = a
+
 -- | Configuration for generating the Main module, specified as a block comment.
-data AutoCollectConfig = AutoCollectConfig
-  { cfgSuiteName :: Maybe Text
+data AutoCollectConfig' f = AutoCollectConfig
+  { cfgSuiteName :: Apply f (Maybe Text)
   -- ^ The name of the entire test suite
-  , cfgGroupType :: AutoCollectGroupType
+  , cfgGroupType :: Apply f AutoCollectGroupType
   -- ^ How tests should be grouped (defaults to "modules")
-  , cfgStripSuffix :: Text
+  , cfgStripSuffix :: Apply f Text
   -- ^ The suffix to strip from a test, e.g. @strip_suffix = Test@ will relabel
   -- a module @Foo.BarTest@ to @Foo.Bar@.
-  , cfgIngredients :: [Text]
+  , cfgIngredients :: Apply f [Text]
   -- ^ A comma-separated list of extra tasty ingredients to include
-  , cfgIngredientsOverride :: Bool
+  , cfgIngredientsOverride :: Apply f Bool
   -- ^ If true, 'cfgIngredients' overrides the default tasty ingredients;
   -- otherwise, they're prepended to the list of default ingredients (defaults to false)
-  , cfgCustomMain :: Bool
+  , cfgCustomMain :: Apply f Bool
   }
-  deriving (Show, Eq)
+
+type AutoCollectConfigPartial = AutoCollectConfig' Maybe
+deriving instance Show AutoCollectConfigPartial
+deriving instance Eq AutoCollectConfigPartial
+
+type AutoCollectConfig = AutoCollectConfig' Identity
+deriving instance Show AutoCollectConfig
+deriving instance Eq AutoCollectConfig
 
 data AutoCollectGroupType
   = -- | All tests will be flattened like
@@ -64,23 +85,36 @@ data AutoCollectGroupType
     AutoCollectGroupTree
   deriving (Show, Eq)
 
-defaultConfig :: AutoCollectConfig
-defaultConfig =
-  AutoCollectConfig
-    { cfgSuiteName = Nothing
-    , cfgGroupType = AutoCollectGroupModules
-    , cfgIngredients = []
-    , cfgIngredientsOverride = False
-    , cfgStripSuffix = ""
-    , cfgCustomMain = False
-    }
+-- | Config on RHS overrides config on LHS.
+instance Semigroup AutoCollectConfigPartial where
+  cfg1 <> cfg2 =
+    AutoCollectConfig
+      { cfgSuiteName = cfgSuiteName cfg2 <|> cfgSuiteName cfg1
+      , cfgGroupType = cfgGroupType cfg2 <|> cfgGroupType cfg1
+      , cfgIngredients = cfgIngredients cfg2 <|> cfgIngredients cfg1
+      , cfgIngredientsOverride = cfgIngredientsOverride cfg2 <|> cfgIngredientsOverride cfg1
+      , cfgStripSuffix = cfgStripSuffix cfg2 <|> cfgStripSuffix cfg1
+      , cfgCustomMain = cfgCustomMain cfg2 <|> cfgCustomMain cfg1
+      }
 
-parseConfig :: Text -> Either Text AutoCollectConfig
-parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Text.lines
+instance Monoid AutoCollectConfigPartial where
+  mempty =
+    AutoCollectConfig
+      Nothing
+      Nothing
+      Nothing
+      Nothing
+      Nothing
+      Nothing
+
+{----- Parsing -----}
+
+parseConfig :: Text -> Either Text AutoCollectConfigPartial
+parseConfig = fmap mconcat . mapM parseLine . filter (not . isIgnoredLine) . Text.lines
   where
     isIgnoredLine s = Text.null (Text.strip s) || ("#" `Text.isPrefixOf` s)
 
-    parseLine :: Text -> Either Text (AutoCollectConfig -> AutoCollectConfig)
+    parseLine :: Text -> Either Text AutoCollectConfigPartial
     parseLine s = do
       (k, v) <-
         case Text.splitOn "=" s of
@@ -92,24 +126,22 @@ parseConfig = fmap resolve . mapM parseLine . filter (not . isIgnoredLine) . Tex
 
       case k of
         "suite_name" ->
-          pure $ \cfg -> cfg{cfgSuiteName = Just v}
+          pure mempty{cfgSuiteName = Just (Just v)}
         "group_type" -> do
           groupType <- parseGroupType v
-          pure $ \cfg -> cfg{cfgGroupType = groupType}
+          pure mempty{cfgGroupType = Just groupType}
         "strip_suffix" ->
-          pure $ \cfg -> cfg{cfgStripSuffix = v}
+          pure mempty{cfgStripSuffix = Just v}
         "ingredients" -> do
           let ingredients = map Text.strip . Text.splitOn "," $ v
-          pure $ \cfg -> cfg{cfgIngredients = ingredients}
+          pure mempty{cfgIngredients = Just ingredients}
         "ingredients_override" -> do
           override <- parseBool v
-          pure $ \cfg -> cfg{cfgIngredientsOverride = override}
+          pure mempty{cfgIngredientsOverride = Just override}
         "custom_main" -> do
           customMain <- parseBool v
-          pure $ \cfg -> cfg{cfgCustomMain = customMain}
+          pure mempty{cfgCustomMain = Just customMain}
         _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
-
-    resolve fs = compose fs defaultConfig
 
 parseGroupType :: Text -> Either Text AutoCollectGroupType
 parseGroupType = \case
@@ -125,8 +157,18 @@ parseBool s =
     "false" -> pure False
     _ -> Left $ "Invalid bool: " <> Text.pack (show s)
 
-{----- Utilities -----}
+{----- Resolving -----}
 
--- | [f, g, h] => (h . g . f)
-compose :: [a -> a] -> a -> a
-compose fs = foldr (\f acc -> acc . f) id fs
+resolveConfig :: AutoCollectConfigPartial -> IO AutoCollectConfig
+resolveConfig = pure . resolve
+  where
+    resolve :: AutoCollectConfigPartial -> AutoCollectConfig
+    resolve AutoCollectConfig{..} =
+      AutoCollectConfig
+        { cfgSuiteName = fromMaybe Nothing cfgSuiteName
+        , cfgGroupType = fromMaybe AutoCollectGroupModules cfgGroupType
+        , cfgIngredients = fromMaybe [] cfgIngredients
+        , cfgIngredientsOverride = fromMaybe False cfgIngredientsOverride
+        , cfgStripSuffix = fromMaybe "" cfgStripSuffix
+        , cfgCustomMain = fromMaybe False cfgCustomMain
+        }
