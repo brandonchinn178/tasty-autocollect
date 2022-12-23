@@ -6,7 +6,9 @@ module Test.Tasty.AutoCollect.GenerateMain (
   generateMainModule,
 ) where
 
+import Control.Monad (guard)
 import qualified Data.ByteString as ByteString
+import Data.Char (isDigit, isLower, isUpper)
 import Data.List (sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe)
@@ -91,15 +93,25 @@ findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestMo
     toTestModule fp = do
       fileContentsBS <- ByteString.readFile fp
       pure $
-        case (splitExtensions fp, parseModuleType <$> Text.decodeUtf8' fileContentsBS) of
-          ((fpNoExt, ".hs"), Right (Just ModuleTest)) ->
-            let moduleName = Text.replace "/" "." . Text.pack . makeRelative testDir $ fpNoExt
-             in Just
+        case splitExtensions fp of
+          (fpNoExt, ".hs")
+            | Right (Just ModuleTest) <- parseModuleType <$> Text.decodeUtf8' fileContentsBS
+            , Just moduleName <- toModuleName $ Text.pack (makeRelative testDir fpNoExt) ->
+                Just
                   TestModule
                     { moduleName
                     , displayName = withoutSuffix (cfgStripSuffix cfg) moduleName
                     }
           _ -> Nothing
+
+    toModuleName = fmap (Text.intercalate ".") . mapM validateModuleName . Text.splitOn "/"
+    -- https://www.haskell.org/onlinereport/syntax-iso.html
+    -- large { small | large | digit | ' }
+    validateModuleName name = do
+      (first, rest) <- Text.uncons name
+      guard $ isUpper first
+      guard $ Text.all (\c -> isUpper c || isLower c || isDigit c || c == '\'') rest
+      Just name
 
     mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
     mapMaybeM f = fmap catMaybes . mapM f

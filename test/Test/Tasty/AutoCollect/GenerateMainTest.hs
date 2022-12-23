@@ -52,6 +52,16 @@ test =
         )
         ["{- AUTOCOLLECT.MAIN -}"]
 
+test =
+  testCase "ignores directories with invalid module name" $
+    assertSuccess_ . runMainWith (addFiles [("A/&Bad/Foo.hs", ["{- AUTOCOLLECT.TEST -}"])]) $
+      ["{- AUTOCOLLECT.MAIN -}"]
+
+test =
+  testCase "ignores files with invalid module name" $
+    assertSuccess_ . runMainWith (addFiles [("A/#Foo#.hs", ["{- AUTOCOLLECT.TEST -}"])]) $
+      ["{- AUTOCOLLECT.MAIN -}"]
+
 test_batch =
   [ testGolden
     ("output for group_type = " <> groupType <> " is as expected")
