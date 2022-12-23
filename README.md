@@ -8,9 +8,10 @@ A preprocessor/compiler plugin that will automatically collect Tasty tests and g
 
 Design goals:
 * Don't use any weird syntax so that syntax highlighters, linters, and formatters still work
-* Support test functions with multiple arguments like `tasty-golden`'s API (which `tasty-discover` doesn't easily support)
 * Avoid universally exporting the whole test module, so that GHC can warn about unused test helpers
 * Support arbitrary test functions (e.g. user-defined test helpers or third-party tasty libraries)
+* Minimal dependencies
+  * Only uses boot libraries, with two exceptions: `tasty` + `tasty-expected-failure`
 
 ## Quickstart
 
@@ -176,8 +177,16 @@ test_prop_expectFailBecause "Issue #123" "some property" x = x === x
 ```hs
 {- AUTOCOLLECT.MAIN
 suite_name = foo
+
+# comments can start with a hash symbol
+group_type = flat
 -}
 ```
+
+* `import`: A comma separated list of files (relative to the Main file) containing configuration to import
+    * Recommended file extension: `.conf`
+    * Configuration in files later in the list override configuration in files earlier in the list
+    * Configuration in the Main file override imported configuration
 
 * `suite_name`: The name to use in the `testGroup` at the root of the test suite `TestTree` (defaults to the path of the main file)
 

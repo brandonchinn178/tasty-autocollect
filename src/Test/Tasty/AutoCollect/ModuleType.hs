@@ -13,7 +13,7 @@ import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants
 
 data ModuleType
-  = ModuleMain AutoCollectConfig
+  = ModuleMain AutoCollectConfigPartial
   | ModuleTest
   deriving (Show, Eq)
 
