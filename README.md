@@ -246,6 +246,12 @@ Disadvantages:
 
 ## Appendix
 
+### Debugging 
+
+To inspect the generated Main module, build with `-keep-tmp-files`, and look in `$TMPDIR` for a `ghc_1.hspp` file. (Upstream tickets: [GHC](https://gitlab.haskell.org/ghc/ghc/-/issues/22258), [Stack](https://github.com/commercialhaskell/stack/issues/5892))
+
+To inspect the converted test modules, build with `-ddump-rn -ddump-to-file` and look for the `.dump-rn` files in `.stack-work/` or `dist-newstyle/`.
+
 ### Note for Ormolu/Fourmolu
 
 If you're using Ormolu or Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the comment will be moved out of the export list.
