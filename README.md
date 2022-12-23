@@ -246,6 +246,14 @@ Disadvantages:
 
 ## Appendix
 
+### Note for Ormolu/Fourmolu
+
+If you're using Ormolu or Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the comment will be moved out of the export list.
+
+This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
+
+Upstream ticket: https://github.com/tweag/ormolu/issues/906
+
 ### How it works
 
 The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preprocessor, which does one of three things at the very beginning of compilation:
@@ -255,9 +263,3 @@ The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preproces
 3. Otherwise, do nothing
 
 In a test file, the plugin will search for any functions named `test`. It will then rename the function to `tasty_test_N`, where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
-
-### Notes
-
-* If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.
-    * This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
-    * Upstream ticket: https://github.com/tweag/ormolu/issues/906
