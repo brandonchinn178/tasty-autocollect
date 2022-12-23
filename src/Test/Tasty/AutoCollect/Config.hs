@@ -17,10 +17,13 @@ module Test.Tasty.AutoCollect.Config (
 ) where
 
 import Control.Applicative ((<|>))
+import Control.Monad (forM)
 import Data.Functor.Identity (Identity)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
+import System.FilePath (takeDirectory, (</>))
 
 {----- Configuration -----}
 
@@ -30,7 +33,9 @@ type family Apply f a where
 
 -- | Configuration for generating the Main module, specified as a block comment.
 data AutoCollectConfig' f = AutoCollectConfig
-  { cfgSuiteName :: Apply f (Maybe Text)
+  { cfgImports :: Apply f [FilePath]
+  -- ^ Files to import
+  , cfgSuiteName :: Apply f (Maybe Text)
   -- ^ The name of the entire test suite
   , cfgGroupType :: Apply f AutoCollectGroupType
   -- ^ How tests should be grouped (defaults to "modules")
@@ -89,7 +94,8 @@ data AutoCollectGroupType
 instance Semigroup AutoCollectConfigPartial where
   cfg1 <> cfg2 =
     AutoCollectConfig
-      { cfgSuiteName = cfgSuiteName cfg2 <|> cfgSuiteName cfg1
+      { cfgImports = cfgImports cfg2 <|> cfgImports cfg1
+      , cfgSuiteName = cfgSuiteName cfg2 <|> cfgSuiteName cfg1
       , cfgGroupType = cfgGroupType cfg2 <|> cfgGroupType cfg1
       , cfgIngredients = cfgIngredients cfg2 <|> cfgIngredients cfg1
       , cfgIngredientsOverride = cfgIngredientsOverride cfg2 <|> cfgIngredientsOverride cfg1
@@ -100,6 +106,7 @@ instance Semigroup AutoCollectConfigPartial where
 instance Monoid AutoCollectConfigPartial where
   mempty =
     AutoCollectConfig
+      Nothing
       Nothing
       Nothing
       Nothing
@@ -125,6 +132,8 @@ parseConfig = fmap mconcat . mapM parseLine . filter (not . isIgnoredLine) . Tex
           _ -> Left $ "Invalid configuration line: " <> Text.pack (show s)
 
       case k of
+        "import" ->
+          pure mempty{cfgImports = Just $ map Text.unpack $ parseCSV v}
         "suite_name" ->
           pure mempty{cfgSuiteName = Just (Just v)}
         "group_type" -> do
@@ -132,9 +141,8 @@ parseConfig = fmap mconcat . mapM parseLine . filter (not . isIgnoredLine) . Tex
           pure mempty{cfgGroupType = Just groupType}
         "strip_suffix" ->
           pure mempty{cfgStripSuffix = Just v}
-        "ingredients" -> do
-          let ingredients = map Text.strip . Text.splitOn "," $ v
-          pure mempty{cfgIngredients = Just ingredients}
+        "ingredients" ->
+          pure mempty{cfgIngredients = Just $ parseCSV v}
         "ingredients_override" -> do
           override <- parseBool v
           pure mempty{cfgIngredientsOverride = Just override}
@@ -150,6 +158,9 @@ parseGroupType = \case
   "tree" -> pure AutoCollectGroupTree
   ty -> Left $ "Invalid group_type: " <> Text.pack (show ty)
 
+parseCSV :: Text -> [Text]
+parseCSV = map Text.strip . Text.splitOn ","
+
 parseBool :: Text -> Either Text Bool
 parseBool s =
   case Text.toLower s of
@@ -159,13 +170,25 @@ parseBool s =
 
 {----- Resolving -----}
 
-resolveConfig :: AutoCollectConfigPartial -> IO AutoCollectConfig
-resolveConfig = pure . resolve
+resolveConfig :: FilePath -> AutoCollectConfigPartial -> IO AutoCollectConfig
+resolveConfig path0 cfg0 = resolve <$> resolveImports path0 cfg0
   where
+    resolveImports path cfg = do
+      let imports = fromMaybe [] $ cfgImports cfg
+      fmap (mergeConfigs cfg) . forM imports $ \imp -> do
+        let fp = takeDirectory path </> imp
+        file <- Text.readFile fp
+        case parseConfig file of
+          Right cfg' -> resolveImports fp cfg'
+          Left e -> errorWithoutStackTrace $ "Could not parse imported config (" <> fp <> "): " <> Text.unpack e
+
+    mergeConfigs cfg importedCfgs = mconcat importedCfgs <> cfg
+
     resolve :: AutoCollectConfigPartial -> AutoCollectConfig
     resolve AutoCollectConfig{..} =
       AutoCollectConfig
-        { cfgSuiteName = fromMaybe Nothing cfgSuiteName
+        { cfgImports = []
+        , cfgSuiteName = fromMaybe Nothing cfgSuiteName
         , cfgGroupType = fromMaybe AutoCollectGroupModules cfgGroupType
         , cfgIngredients = fromMaybe [] cfgIngredients
         , cfgIngredientsOverride = fromMaybe False cfgIngredientsOverride

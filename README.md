@@ -183,6 +183,11 @@ group_type = flat
 -}
 ```
 
+* `import`: A comma separated list of files (relative to the Main file) containing configuration to import
+    * Recommended file extension: `.conf`
+    * Configuration in files later in the list override configuration in files earlier in the list
+    * Configuration in the Main file override imported configuration
+
 * `suite_name`: The name to use in the `testGroup` at the root of the test suite `TestTree` (defaults to the path of the main file)
 
 * `group_type`: How the tests should be grouped (defaults to `modules`)

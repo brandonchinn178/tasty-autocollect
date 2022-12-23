@@ -239,6 +239,32 @@ test = testCase "allows overriding suite name" $ do
       ]
   stdout @?~ startsWith "my-test-suite"
 
+test = testCase "allows importing configuration" $ do
+  (stdout, _) <-
+    assertSuccess . runMainWith (addFiles [("autocollect.conf", config), testFile]) $
+      [ "{- AUTOCOLLECT.MAIN"
+      , "import = autocollect.conf"
+      , "suite_name = my-actual-test-suite"
+      , "-}"
+      ]
+  stdout @?~ startsWith "my-actual-test-suite"
+  getTestLines stdout @?~ containsStripped (eq "MyLibrary")
+  where
+    config =
+      [ "# this is a comment in imported config"
+      , "suite_name = my-test-suite"
+      , "strip_suffix = Test"
+      ]
+    testFile =
+      ( "MyLibraryTest.hs"
+      ,
+        [ "{- AUTOCOLLECT.TEST -}"
+        , "module MyLibraryTest where"
+        , "import Test.Tasty.HUnit"
+        , "test = testCase \"my test\" $ pure ()"
+        ]
+      )
+
 test = testCase "allows customizing main module" $ do
   (stdout, _) <-
     assertSuccess . runMainWith (setTestFiles testFiles) $

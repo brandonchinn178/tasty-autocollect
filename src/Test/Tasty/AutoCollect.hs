@@ -17,7 +17,7 @@ processFile :: FilePath -> Text -> IO Text
 processFile path file =
   case parseModuleType file of
     Just (ModuleMain cfg) -> do
-      cfg' <- resolveConfig cfg
+      cfg' <- resolveConfig path cfg
       addLinePragma <$> generateMainModule cfg' path file
     Just ModuleTest ->
       pure
