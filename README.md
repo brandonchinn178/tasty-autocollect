@@ -8,9 +8,10 @@ A preprocessor/compiler plugin that will automatically collect Tasty tests and g
 
 Design goals:
 * Don't use any weird syntax so that syntax highlighters, linters, and formatters still work
-* Support test functions with multiple arguments like `tasty-golden`'s API (which `tasty-discover` doesn't easily support)
 * Avoid universally exporting the whole test module, so that GHC can warn about unused test helpers
 * Support arbitrary test functions (e.g. user-defined test helpers or third-party tasty libraries)
+* Minimal dependencies
+  * Only uses boot libraries, with two exceptions: `tasty` + `tasty-expected-failure`
 
 ## Quickstart
 
