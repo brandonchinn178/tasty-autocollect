@@ -12,9 +12,7 @@ Design goals:
 * Avoid universally exporting the whole test module, so that GHC can warn about unused test helpers
 * Support arbitrary test functions (e.g. user-defined test helpers or third-party tasty libraries)
 
-## Usage
-
-### Quickstart
+## Quickstart
 
 1. Add the following to your `package.yaml` or `.cabal` file:
 
@@ -80,80 +78,6 @@ Design goals:
         , testCase "some other test" $ pure ()
         ]
     ```
-
-### How it works
-
-The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preprocessor, which does one of three things at the very beginning of compilation:
-
-1. If the file contains `{- AUTOCOLLECT.MAIN -}`, find all test modules and generate a main module.
-2. If the file contains `{- AUTOCOLLECT.TEST -}`, register the `tasty-autocollect` GHC plugin to rewrite tests (see below).
-3. Otherwise, do nothing
-
-In a test file, the plugin will search for any functions named `test`. It will then rename the function to `tasty_test_N`, where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
-
-### Configuration
-
-`tasty-autocollect` can be configured by adding `k = v` lines to the same block comment as `AUTOCOLLECT.MAIN`; e.g.
-
-```hs
-{- AUTOCOLLECT.MAIN
-suite_name = foo
--}
-```
-
-* `suite_name`: The name to use in the `testGroup` at the root of the test suite `TestTree` (defaults to the path of the main file)
-
-* `group_type`: How the tests should be grouped (defaults to `modules`)
-    * `flat`: All the tests are in the same namespace
-        ```
-        Main.hs
-          test 1: OK
-          test 2: OK
-          test 3: OK
-        ```
-
-    * `modules`: Tests are grouped by their module
-        ```
-        Main.hs
-          Test.Module1
-            test1: OK
-            test2: OK
-          Test.Module2
-            test3: OK
-        ```
-
-    * `tree`: Tests are grouped by their module, which is broken out into a tree
-        ```
-        Main.hs
-          Test
-            Module1
-              test1: OK
-              test2: OK
-            Module2
-              test3: OK
-        ```
-
-* `strip_suffix`: The suffix to strip from a test module, e.g. `strip_suffix = Test` will relabel a `Foo.BarTest` module to `Foo.Bar`
-
-* `ingredients`: A comma-separated list of extra tasty ingredients to include, e.g.
-
-    ```
-    ingredients = SomeLibrary.ingredient1, SomeLibrary.ingredient2
-    ```
-
-* `ingredients_override`: By default, `ingredients` will add the ingredients in front of the default `tasty` ingredients. When `true`, does not automatically include the default `tasty` ingredients, for complete control over the ingredient order.
-
-* `custom_main`: If you'd like fine-grained control over how the `Main` module is generated (e.g. if you're using `NoImplicitPrelude` or custom preludes), set this to `true`. When set, it will do the following replacements:
-    * `{- AUTOCOLLECT.MAIN.imports -}`: replaced with the import lines needed for the tests.
-    * `{- AUTOCOLLECT.MAIN.tests -}`: replaced with the `[TestTree]` list, all on one line. If you're using a formatter or linter, it might be helpful to do `tests = id {- AUTOCOLLECT.MAIN.tests -}` so that the code still parses.
-
-    Due to current limitations, the above comments need to be matched exactly (e.g. not with `--` comments or extra whitespace).
-
-### Notes
-
-* If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.
-    * This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
-    * Upstream ticket: https://github.com/tweag/ormolu/issues/906
 
 ## Features
 
@@ -245,6 +169,64 @@ test_prop_expectFailBecause :: Int -> Property
 test_prop_expectFailBecause "Issue #123" "some property" x = x === x
 ```
 
+## Configuration
+
+`tasty-autocollect` can be configured by adding `k = v` lines to the same block comment as `AUTOCOLLECT.MAIN`; e.g.
+
+```hs
+{- AUTOCOLLECT.MAIN
+suite_name = foo
+-}
+```
+
+* `suite_name`: The name to use in the `testGroup` at the root of the test suite `TestTree` (defaults to the path of the main file)
+
+* `group_type`: How the tests should be grouped (defaults to `modules`)
+    * `flat`: All the tests are in the same namespace
+        ```
+        Main.hs
+          test 1: OK
+          test 2: OK
+          test 3: OK
+        ```
+
+    * `modules`: Tests are grouped by their module
+        ```
+        Main.hs
+          Test.Module1
+            test1: OK
+            test2: OK
+          Test.Module2
+            test3: OK
+        ```
+
+    * `tree`: Tests are grouped by their module, which is broken out into a tree
+        ```
+        Main.hs
+          Test
+            Module1
+              test1: OK
+              test2: OK
+            Module2
+              test3: OK
+        ```
+
+* `strip_suffix`: The suffix to strip from a test module, e.g. `strip_suffix = Test` will relabel a `Foo.BarTest` module to `Foo.Bar`
+
+* `ingredients`: A comma-separated list of extra tasty ingredients to include, e.g.
+
+    ```
+    ingredients = SomeLibrary.ingredient1, SomeLibrary.ingredient2
+    ```
+
+* `ingredients_override`: By default, `ingredients` will add the ingredients in front of the default `tasty` ingredients. When `true`, does not automatically include the default `tasty` ingredients, for complete control over the ingredient order.
+
+* `custom_main`: If you'd like fine-grained control over how the `Main` module is generated (e.g. if you're using `NoImplicitPrelude` or custom preludes), set this to `true`. When set, it will do the following replacements:
+    * `{- AUTOCOLLECT.MAIN.imports -}`: replaced with the import lines needed for the tests.
+    * `{- AUTOCOLLECT.MAIN.tests -}`: replaced with the `[TestTree]` list, all on one line. If you're using a formatter or linter, it might be helpful to do `tests = id {- AUTOCOLLECT.MAIN.tests -}` so that the code still parses.
+
+    Due to current limitations, the above comments need to be matched exactly (e.g. not with `--` comments or extra whitespace).
+
 ## Comparison with `tasty-discover`
 
 Advantages:
@@ -261,3 +243,21 @@ Advantages:
 Disadvantages:
 * Uses both a preprocessor and a plugin (`tasty-discover` only uses a preprocessor)
     * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
+
+## Appendix
+
+### How it works
+
+The `package.yaml`/`.cabal` snippet registers `tasty-autocollect` as a preprocessor, which does one of three things at the very beginning of compilation:
+
+1. If the file contains `{- AUTOCOLLECT.MAIN -}`, find all test modules and generate a main module.
+2. If the file contains `{- AUTOCOLLECT.TEST -}`, register the `tasty-autocollect` GHC plugin to rewrite tests (see below).
+3. Otherwise, do nothing
+
+In a test file, the plugin will search for any functions named `test`. It will then rename the function to `tasty_test_N`, where `N` is an autoincrementing, unique number. Then it will collect all the tests into a `tasty_tests :: [TestTree]` binding, which is exported at the location of the `{- AUTOCOLLECT.TEST.export -}` comment.
+
+### Notes
+
+* If you're using a formatter like Ormolu/Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the formatter will move it out of the export list.
+    * This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
+    * Upstream ticket: https://github.com/tweag/ormolu/issues/906
