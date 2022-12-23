@@ -1,5 +1,7 @@
 # Unreleased
 
+# v0.4.0
+
 * Drop support for GHC 8.10
 * Added support for where clauses in `test_prop`, where the where clause may reference the generated arguments in `test_prop`
 * Don't autocollect invalid module names
