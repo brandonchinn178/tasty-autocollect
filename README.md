@@ -236,7 +236,9 @@ group_type = flat
 
     Due to current limitations, the above comments need to be matched exactly (e.g. not with `--` comments or extra whitespace).
 
-## Comparison with `tasty-discover`
+## Comparison with other libraries
+
+### `tasty-discover`
 
 Advantages:
 * Supports test functions with multiple arguments (e.g. `tasty-golden`)
@@ -250,8 +252,23 @@ Advantages:
     * Configuration is more extensible, since configuration is parsed from a comment in the main module instead of as preprocessor arguments
 
 Disadvantages:
-* Uses both a preprocessor and a plugin (`tasty-discover` only uses a preprocessor)
+* Uses both a preprocessor and a GHC plugin
+    * `tasty-discover` only uses a preprocessor
     * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
+
+### `tasty-th`
+
+Advantages:
+* See `tasty-discover`
+* Automatically generates the `Main.hs` file that discovers + imports all test modules in the directory
+    * `tasty-th` provides `defaultMainGenerator`, but it only discovers tests in the same module, so if you have tests in multiple files, you'd still have to manually import all of them into a `Main.hs` file
+
+Disadvantages:
+* Uses a preprocessor and a GHC plugin
+    * `tasty-th` uses Template Haskell instead of either
+    * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
+* `tasty-th` allows including a subset of functions, but not others
+    * `tasty-autocollect` includes all tests in one exported list
 
 ## Appendix
 
