@@ -169,7 +169,7 @@ test =
         )
       ]
     config =
-      mempty
+      (mempty :: AutoCollectConfigPartial)
         { cfgImports = Just ["foo/autocollect.conf"]
         }
 

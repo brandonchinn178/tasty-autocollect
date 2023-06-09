@@ -77,10 +77,7 @@ mkHsVar :: Name -> LHsExpr GhcPs
 mkHsVar = lhsvar . genLoc . getRdrName
 
 mkHsAppTypes :: LHsExpr GhcPs -> [LHsType GhcPs] -> LHsExpr GhcPs
-mkHsAppTypes = foldl' mkHsAppType
-
-mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
-mkHsAppType e t = genLoc $ HsAppType xAppTypeE e (HsWC noExtField t)
+mkHsAppTypes = foldl' (\e -> genLoc . mkHsAppType e)
 
 mkHsTyVar :: Name -> LHsType GhcPs
 mkHsTyVar = genLoc . HsTyVar noAnn NotPromoted . genLoc . getRdrName
