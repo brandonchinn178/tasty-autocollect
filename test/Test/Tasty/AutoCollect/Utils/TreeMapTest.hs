@@ -1,7 +1,7 @@
 {- AUTOCOLLECT.TEST -}
 
 module Test.Tasty.AutoCollect.Utils.TreeMapTest (
--- AUTOCOLLECT.TEST.export
+{- AUTOCOLLECT.TEST.export -}
 
 ) where
 

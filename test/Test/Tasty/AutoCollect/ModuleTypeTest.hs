@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Test.Tasty.AutoCollect.ModuleTypeTest (
--- AUTOCOLLECT.TEST.export
+{- AUTOCOLLECT.TEST.export -}
 
 ) where
 

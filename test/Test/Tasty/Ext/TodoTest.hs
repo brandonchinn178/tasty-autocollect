@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Tasty.Ext.TodoTest (
--- AUTOCOLLECT.TEST.export
+{- AUTOCOLLECT.TEST.export -}
 
 ) where
 
