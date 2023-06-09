@@ -13,15 +13,13 @@ jobs:
     steps:
       -
         uses: actions/checkout@v3
-        with:
-          ref: main
       -
         uses: actions/download-artifact@v3
         with:
           name: tasty-autocollect-sdist
           path: ./sdist/
       -
-        uses: brandonchinn178/haskell-actions/parse-cabal-file@parse-cabal-file
+        uses: haskell-actions/parse-cabal-file@v1
         id: cabal_file
         with:
           cabal_file: tasty-autocollect.cabal
@@ -44,10 +42,10 @@ jobs:
           fi
           sed '1 d; /^# v/,$ d' /tmp/changelog-without-unreleased > /tmp/changelog-body
       -
-        uses: brandonchinn178/haskell-actions/hackage-upload@hackage-upload
+        uses: haskell-actions/hackage-publish@v1
         with:
-          archive: sdist/tasty-autocollect-*.tar.gz
-          token: ${{ secrets[steps.hackage_token_secret.outputs.name] }}
+          hackageToken: ${{ secrets[steps.hackage_token_secret.outputs.name] }}
+          packagesPath: ./sdist/
       -
         uses: softprops/action-gh-release@v1
         with:
