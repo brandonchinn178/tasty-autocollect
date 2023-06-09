@@ -403,5 +403,5 @@ getNextTestName = do
 
 {----- Utilities -----}
 
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = fmap concat . mapM f

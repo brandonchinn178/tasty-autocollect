@@ -28,5 +28,5 @@ test =
               ]
         }
 
-child :: Ord k => k -> Maybe v -> [(k, TreeMap k v)] -> (k, TreeMap k v)
+child :: (Ord k) => k -> Maybe v -> [(k, TreeMap k v)] -> (k, TreeMap k v)
 child k v sub = (k, TreeMap v (Map.fromList sub))

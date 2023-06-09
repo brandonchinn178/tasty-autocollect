@@ -42,7 +42,7 @@ import Test.Tasty.AutoCollect.GHC.Shim
 
 {----- Output helpers -----}
 
-showPpr :: Outputable a => a -> String
+showPpr :: (Outputable a) => a -> String
 showPpr = showSDocUnsafe . ppr
 
 {----- Parsers ----}
@@ -99,7 +99,7 @@ mkHsLitString = genLoc . HsLit noAnn . mkHsString
 genLoc :: e -> GenLocated (SrcAnn ann) e
 genLoc = L generatedSrcAnn
 
-firstLocatedWhere :: Ord l => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
+firstLocatedWhere :: (Ord l) => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
 firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
 
 getSpanLine :: SrcSpan -> String

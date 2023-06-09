@@ -113,7 +113,7 @@ findTestModules cfg path = listDirectoryRecursive testDir >>= mapMaybeM toTestMo
       guard $ Text.all (\c -> isUpper c || isLower c || isDigit c || c == '\'') rest
       Just name
 
-    mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
+    mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
     mapMaybeM f = fmap catMaybes . mapM f
 
 generateTests :: AutoCollectConfig -> [TestModule] -> Text

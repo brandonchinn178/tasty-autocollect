@@ -72,7 +72,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-      FOURMOLU_VERSION: '0.10.1.0'
+      FOURMOLU_VERSION: '0.13.0.0'
     steps:
       - uses: actions/checkout@v3
 
@@ -83,7 +83,7 @@ jobs:
             -o /usr/local/bin/fourmolu
           chmod +x /usr/local/bin/fourmolu
       - name: Run fourmolu
-        run: fourmolu -m check $(git ls-files '*.hs')
+        run: fourmolu -m check .
 
   check_sdist:
     runs-on: ubuntu-latest
