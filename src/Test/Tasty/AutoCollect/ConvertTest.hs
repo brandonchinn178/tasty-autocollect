@@ -84,7 +84,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
       if isTestExportComment comment
         then Just loc
         else Nothing
-    exportIE = IEVar NoExtField $ genLoc $ IEName testListName
+    exportIE = IEVar NoExtField $ genLoc $ mkIEName testListName
 
     -- Generate the `tests` list
     mkTestsList :: [LocatedN RdrName] -> [LHsDecl GhcPs]
@@ -403,5 +403,5 @@ getNextTestName = do
 
 {----- Utilities -----}
 
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = fmap concat . mapM f

@@ -29,7 +29,10 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
   mkExplicitList,
   mkExplicitTuple,
   mkLet,
-  xAppTypeE,
+  mkHsAppType,
+
+  -- ** Name
+  mkIEName,
 
   -- * Backports
   thNameToGhcNameIO,
@@ -136,8 +139,13 @@ mkExplicitTuple = ExplicitTuple noAnn
 mkLet :: HsLocalBinds GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkLet binds expr = HsLet noAnn (L NoTokenLoc HsTok) binds (L NoTokenLoc HsTok) expr
 
-xAppTypeE :: XAppTypeE GhcPs
-xAppTypeE = generatedSrcSpan
+mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> HsExpr GhcPs
+mkHsAppType e t = HsAppType generatedSrcSpan e (HsWC noExtField t)
+
+{----- Compat / Name -----}
+
+mkIEName :: LocatedN RdrName -> IEWrappedName RdrName
+mkIEName = IEName
 
 {----- Backports -----}
 

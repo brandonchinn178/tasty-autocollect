@@ -57,13 +57,13 @@ data TreeMap k v = TreeMap
 --     ]
 --   }
 -- @
-fromList :: Ord k => [([k], v)] -> TreeMap k v
+fromList :: (Ord k) => [([k], v)] -> TreeMap k v
 fromList = foldr (uncurry insert) empty
 
 empty :: TreeMap k v
 empty = TreeMap Nothing Map.empty
 
-insert :: Ord k => [k] -> v -> TreeMap k v -> TreeMap k v
+insert :: (Ord k) => [k] -> v -> TreeMap k v -> TreeMap k v
 insert originalKeys v = go originalKeys
   where
     go ks treeMap =

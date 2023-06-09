@@ -29,6 +29,7 @@ isTestExportComment :: String -> Bool
 isTestExportComment = matches "autocollect.test.export" . unwrap
   where
     -- Support '{- $autocollect.test.export$ -}' for Ormolu/Fourmolu support
+    -- Remove when dropping support for Fourmolu < 0.13, Ormolu < 0.7
     unwrap = Text.unpack . withoutPrefix "$" . withoutSuffix "$" . Text.pack
 
 matches :: String -> String -> Bool

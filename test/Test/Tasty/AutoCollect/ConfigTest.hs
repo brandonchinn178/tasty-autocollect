@@ -6,7 +6,8 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.ConfigTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import Control.Monad (forM_)
@@ -144,30 +145,34 @@ test_prop "parseConfig errors on unknown keys" (ConfigPiece k) (ConfigPiece v) =
 test =
   testCase "resolveConfig imports config recursively" $
     withSystemTempDirectory "tasty-autocollect-resolveConfig" $ \tmpdir -> do
-      let
-        files =
-          [
-            ( "foo/autocollect.conf"
-            ,
-              [ "import = ../base/autocollect.conf"
-              , "suite_name = foo"
-              ]
-            )
-          ,
-            ( "base/autocollect.conf"
-            ,
-              [ "suite_name = base"
-              , "ingredients = baseIngredients"
-              ]
-            )
-          ]
       forM_ files $ \(fpRel, fileLines) -> do
         let fp = tmpdir </> fpRel
         createDirectoryIfMissing True (takeDirectory fp)
         Text.writeFile fp (Text.unlines fileLines)
-      cfg <- resolveConfig (tmpdir </> "Main.hs") mempty{cfgImports = Just ["foo/autocollect.conf"]}
+      cfg <- resolveConfig (tmpdir </> "Main.hs") config
       cfgSuiteName cfg @?= Just "foo"
       cfgIngredients cfg @?= ["baseIngredients"]
+  where
+    files =
+      [
+        ( "foo/autocollect.conf"
+        ,
+          [ "import = ../base/autocollect.conf"
+          , "suite_name = foo"
+          ]
+        )
+      ,
+        ( "base/autocollect.conf"
+        ,
+          [ "suite_name = base"
+          , "ingredients = baseIngredients"
+          ]
+        )
+      ]
+    config =
+      (mempty :: AutoCollectConfigPartial)
+        { cfgImports = Just ["foo/autocollect.conf"]
+        }
 
 {----- Helpers -----}
 

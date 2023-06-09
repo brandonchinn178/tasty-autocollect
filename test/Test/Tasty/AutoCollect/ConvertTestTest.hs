@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Tasty.AutoCollect.ConvertTestTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import Control.Monad (forM_)

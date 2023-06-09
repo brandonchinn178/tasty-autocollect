@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Examples (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import Test.Tasty.Golden

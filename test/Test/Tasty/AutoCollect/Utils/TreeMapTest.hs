@@ -1,7 +1,8 @@
 {- AUTOCOLLECT.TEST -}
 
 module Test.Tasty.AutoCollect.Utils.TreeMapTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import qualified Data.Map.Strict as Map
@@ -28,5 +29,5 @@ test =
               ]
         }
 
-child :: Ord k => k -> Maybe v -> [(k, TreeMap k v)] -> (k, TreeMap k v)
+child :: (Ord k) => k -> Maybe v -> [(k, TreeMap k v)] -> (k, TreeMap k v)
 child k v sub = (k, TreeMap v (Map.fromList sub))

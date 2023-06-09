@@ -8,20 +8,12 @@ module Test.Tasty.AutoCollect.GHC.Shim_Common (
 ) where
 
 import GHC.Hs
-#if __GLASGOW_HASKELL__ == 810
-import BasicTypes (PromotionFlag)
-import RdrName (RdrName)
-import SrcLoc (Located)
-#elif __GLASGOW_HASKELL__ == 900
+#if __GLASGOW_HASKELL__ < 906
 import GHC.Types.Basic (PromotionFlag)
+#endif
 import GHC.Types.Name.Reader (RdrName)
+#if __GLASGOW_HASKELL__ < 902
 import GHC.Types.SrcLoc (Located)
-#elif __GLASGOW_HASKELL__ == 902
-import GHC.Types.Basic (PromotionFlag)
-import GHC.Types.Name.Reader (RdrName)
-#elif __GLASGOW_HASKELL__ == 904
-import GHC.Types.Basic (PromotionFlag)
-import GHC.Types.Name.Reader (RdrName)
 #endif
 
 #if __GLASGOW_HASKELL__ < 902

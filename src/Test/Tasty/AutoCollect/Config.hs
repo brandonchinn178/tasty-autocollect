@@ -133,23 +133,24 @@ parseConfig = fmap mconcat . mapM parseLine . filter (not . isIgnoredLine) . Tex
 
       case k of
         "import" ->
-          pure mempty{cfgImports = Just $ map Text.unpack $ parseCSV v}
+          pure emptyConfig{cfgImports = Just $ map Text.unpack $ parseCSV v}
         "suite_name" ->
-          pure mempty{cfgSuiteName = Just (Just v)}
+          pure emptyConfig{cfgSuiteName = Just (Just v)}
         "group_type" -> do
           groupType <- parseGroupType v
-          pure mempty{cfgGroupType = Just groupType}
+          pure emptyConfig{cfgGroupType = Just groupType}
         "strip_suffix" ->
-          pure mempty{cfgStripSuffix = Just v}
+          pure emptyConfig{cfgStripSuffix = Just v}
         "ingredients" ->
-          pure mempty{cfgIngredients = Just $ parseCSV v}
+          pure emptyConfig{cfgIngredients = Just $ parseCSV v}
         "ingredients_override" -> do
           override <- parseBool v
-          pure mempty{cfgIngredientsOverride = Just override}
+          pure emptyConfig{cfgIngredientsOverride = Just override}
         "custom_main" -> do
           customMain <- parseBool v
-          pure mempty{cfgCustomMain = Just customMain}
+          pure emptyConfig{cfgCustomMain = Just customMain}
         _ -> Left $ "Invalid configuration key: " <> Text.pack (show k)
+    emptyConfig = mempty :: AutoCollectConfigPartial
 
 parseGroupType :: Text -> Either Text AutoCollectGroupType
 parseGroupType = \case

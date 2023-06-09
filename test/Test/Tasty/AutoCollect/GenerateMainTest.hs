@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Tasty.AutoCollect.GenerateMainTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import qualified Data.ByteString as ByteString
