@@ -24,22 +24,26 @@ jobs:
       STACK_YAML: ${{ matrix.stack_yaml }}
 
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
-      - name: Build + test
+      -
+        name: Build + test
         run: stack test --coverage
-
-      - name: Check that files are unmodified
+      -
+        name: Check that files are unmodified
         run: git diff --exit-code
 
-      # upload coverage data
-      - name: Generate coverage data
+      # Upload coverage data
+      -
+        name: Generate coverage data
         run: stack install hpc-lcov && hpc-lcov
-      - uses: codecov/codecov-action@v2
+      -
+        uses: codecov/codecov-action@v2
         with:
           files: lcov.info
         if: ${{ matrix.latest }}
@@ -47,60 +51,73 @@ jobs:
   cabal_test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: haskell/actions/setup@v2
-      - run: cabal update
-      - run: cabal freeze
-      - run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: haskell/actions/setup@v2
+      -
+        run: cabal update
+      -
+        run: cabal freeze
+      -
+        run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.cabal/store
           key: ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
           restore-keys: |
                ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-
-      - run:
+      -
+        run:
           cabal configure
             --enable-tests
             --test-show-details=streaming
             --test-options="--color=always"
             --write-ghc-environment-files=always
-      - run: |
+      -
+        run: |
           cabal v2-build
           echo "GHC_ENVIRONMENT=${PWD}/$(ls .ghc.environment.*)" | tee -a "$GITHUB_ENV"
-      - run: cabal v2-test
+      -
+        run: cabal v2-test
 
   lint:
     runs-on: ubuntu-latest
     env:
       FOURMOLU_VERSION: '0.13.0.0'
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install fourmolu
+      -
+        uses: actions/checkout@v3
+      -
+        name: Install fourmolu
         run: |
           curl -sSL \
             "https://github.com/fourmolu/fourmolu/releases/download/v${FOURMOLU_VERSION}/fourmolu-${FOURMOLU_VERSION}-linux-x86_64" \
             -o /usr/local/bin/fourmolu
           chmod +x /usr/local/bin/fourmolu
-      - name: Run fourmolu
+      -
+        name: Run fourmolu
         run: fourmolu -m check .
 
   check_sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml', 'package.yaml') }}
-
-      - name: Strip unreleased section from CHANGELOG
+      -
+        name: Strip unreleased section from CHANGELOG
         run: sed -i -n '/^# Unreleased/d; /^# /,$p' CHANGELOG.md
-
-      - name: Create sdist bundle
+      -
+        name: Create sdist bundle
         run: stack sdist --test-tarball --tar-dir .
-
-      - uses: actions/upload-artifact@v3
+      -
+        uses: actions/upload-artifact@v3
         with:
           name: tasty-autocollect-sdist
           path: tasty-autocollect-*.tar.gz
