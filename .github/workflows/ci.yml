@@ -10,16 +10,15 @@ jobs:
   build_and_test:
     strategy:
       matrix:
-        stack_yaml:
-          - stack-ghc-9.0.yaml
-          - stack-ghc-9.2.yaml
-          - stack-ghc-9.4.yaml
         include:
-          - stack_yaml: stack.yaml
+          -
+            stack_yaml: stack.yaml
             latest: true
+          -
+            stack_yaml: stack-ghc-9.0.yaml
 
     name: build_and_test (${{ matrix.stack_yaml }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       STACK_YAML: ${{ matrix.stack_yaml }}
 
@@ -55,39 +54,47 @@ jobs:
         with:
           files: lcov.info
 
-  cabal_test:
+  ghc_compat_test:
+    strategy:
+      matrix:
+        ghc_version:
+          - '9.0'
+          - '9.2'
+          - '9.4'
+
+    name: ghc_compat_test (${{ matrix.ghc_version }})
     runs-on: ubuntu-latest
+
     steps:
       -
         uses: actions/checkout@v3
       -
-        uses: haskell/actions/setup@v2
+        id: setup
+        name: Set up GHC ${{ matrix.ghc_version }}
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc_version }}
       -
-        run: cabal update
+        name: Configure the build
+        run: |
+          cabal configure \
+            --enable-test \
+            --test-options="--color=always" \
+            --test-show-details=streaming
+          cabal build --dry-run
       -
-        run: cabal freeze
-      -
+        name: Get current month to clear cache
         run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
       -
         uses: actions/cache@v3
         with:
-          path: ~/.cabal/store
-          key: ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-${{ hashFiles('cabal.project.freeze') }}
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ matrix.ghc_version }}-${{ hashFiles('**/plan.json') }}
           restore-keys: |
-               ${{ runner.os }}-cabal_store-cache-${{ env.CURR_MONTH }}-
+               ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ matrix.ghc_version }}-
       -
-        run:
-          cabal configure
-            --enable-tests
-            --test-show-details=streaming
-            --test-options="--color=always"
-            --write-ghc-environment-files=always
-      -
-        run: |
-          cabal v2-build
-          echo "GHC_ENVIRONMENT=${PWD}/$(ls .ghc.environment.*)" | tee -a "$GITHUB_ENV"
-      -
-        run: cabal v2-test
+        name: Build + Test
+        run: cabal build && cabal exec -- cabal test
 
   lint:
     runs-on: ubuntu-latest
