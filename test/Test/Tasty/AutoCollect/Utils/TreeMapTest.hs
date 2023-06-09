@@ -1,7 +1,8 @@
 {- AUTOCOLLECT.TEST -}
 
 module Test.Tasty.AutoCollect.Utils.TreeMapTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import qualified Data.Map.Strict as Map

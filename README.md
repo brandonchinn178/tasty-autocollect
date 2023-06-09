@@ -280,11 +280,9 @@ To inspect the converted test modules, build with `-ddump-rn -ddump-to-file` and
 
 ### Note for Ormolu/Fourmolu
 
-If you're using Ormolu or Fourmolu, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, the comment will be moved out of the export list.
+If you're using Ormolu < 0.7 or Fourmolu < 0.13, use `-- $AUTOCOLLECT.TEST.export$` instead; otherwise, [the comment will be moved out of the export list](https://github.com/tweag/ormolu/issues/906).
 
-This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes a problem for you, please open an issue.
-
-Upstream ticket: https://github.com/tweag/ormolu/issues/906
+This works around the issue by reusing Haddock's named section syntax, but it shouldn't be an issue because you shouldn't be building Haddocks for test modules. If this becomes an issue, upgrade Ormolu or Fourmolu.
 
 ### How it works
 

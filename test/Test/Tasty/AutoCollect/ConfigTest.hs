@@ -6,7 +6,8 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Test.Tasty.AutoCollect.ConfigTest (
-  -- $AUTOCOLLECT.TEST.export$
+-- AUTOCOLLECT.TEST.export
+
 ) where
 
 import Control.Monad (forM_)
