@@ -152,8 +152,7 @@ test_ignoreTestBecause "Issue #123" = testCase "this test is skipped" $ ...
 The last example will be converted into the equivalent of:
 
 ```hs
-tasty_test_4 :: TestTree
-tasty_test_4 =
+test =
   ignoreTestBecause "Issue #123" $
     testCase "this test is skipped" $ ...
 ```
@@ -238,37 +237,36 @@ group_type = flat
 
 ## Comparison with other libraries
 
-### `tasty-discover`
-
 Advantages:
-* Supports test functions with multiple arguments (e.g. `tasty-golden`)
-* Avoids hardcoding testers like `unit_` or `prop_`
+* Avoids hardcoding blessed test frameworks
+  * Both `tasty-discover` and `tasty-th` prefix tests with hardcoded prefixes like `unit_` or `prop_`. While they both provide a mechanism to specify arbitrary `TestTree`s with `test_`, it makes for a less seamless integration with unblessed test frameworks, such as `tasty-golden`:
+    ```hs
+    test_do_something :: TestTree
+    test_do_something =
+      goldenVsString "do something" "goldens/do_something.golden" $ ...
+    ```
+  * With `tasty-autocollect`, all tests are specified the same way (modulo some syntax sugar niceties like `test_prop`)
 * Avoids rewriting test label twice in function name
+  * Both `tasty-discover` and `tasty-th` force you to repeat long test names twice:
+    ```hs
+    unit_this_is_a_test :: Assertion
+    unit_this_is_a_test = do
+      ...
+    ```
 * Avoids test name restrictions
-    * Because `tasty-discover` couples the function name with the test label, you can't do things like use punctuation in the test label. So `tasty-discover` doesn't allow writing the equivalent of `testProperty "reverse . reverse === id"`.
+  * Because `tasty-discover` and `tasty-th` couple the function name with the test label, you can't do things like use punctuation in the test label. So these frameworks don't allow writing the equivalent of `testProperty "reverse . reverse === id"`.
 * More features out-of-the-box (see "Features" section)
 * More configurable
-    * More configuration options
-    * Configuration is more extensible, since configuration is parsed from a comment in the main module instead of as preprocessor arguments
+  * More configuration options
+  * Configuration is more extensible, since configuration is parsed from a comment in the main module instead of as preprocessor arguments (for `tasty-discover`)
+  * `tasty-th` isn't configurable at all
+* Automatically generates the `Main.hs` file that discovers + imports all test modules in the directory
+  * `tasty-discover` does this, but `tasty-th` does not; `tasty-th` provides `defaultMainGenerator`, but it only discovers tests in the same module, so if you have tests in multiple files, you'd still have to manually import all of them into a `Main.hs` file
 
 Disadvantages:
 * Uses both a preprocessor and a GHC plugin
-    * `tasty-discover` only uses a preprocessor
-    * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
-
-### `tasty-th`
-
-Advantages:
-* See `tasty-discover`
-* Automatically generates the `Main.hs` file that discovers + imports all test modules in the directory
-    * `tasty-th` provides `defaultMainGenerator`, but it only discovers tests in the same module, so if you have tests in multiple files, you'd still have to manually import all of them into a `Main.hs` file
-
-Disadvantages:
-* Uses a preprocessor and a GHC plugin
-    * `tasty-th` uses Template Haskell instead of either
-    * Haven't tested performance yet, but I wouldn't be surprised if there's a non-negligible performance cost
-* `tasty-th` allows including a subset of functions, but not others
-    * `tasty-autocollect` includes all tests in one exported list
+    * `tasty-discover` only uses a preprocessor, while `tasty-th` uses Template Haskell
+    * Haven't tested performance yet, but I wouldn't be surprised if compilation takes longer
 
 ## Appendix
 
