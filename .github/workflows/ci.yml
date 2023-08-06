@@ -75,7 +75,9 @@ jobs:
       -
         if: ${{ matrix.oldest }}
         name: Use oldest dependencies
-        run: cabal configure --enable-append --prefer-oldest
+        run: |
+          cabal configure --enable-append --prefer-oldest
+          echo 'TEST_PREFER_OLDEST=1' >> "${GITHUB_ENV}"
       -
         name: Get build plan
         run: cabal build --dry-run
