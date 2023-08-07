@@ -4,11 +4,14 @@
 
 module TestUtils.Golden (
   testGolden,
+  testGoldenVersioned,
 ) where
 
 import Data.Text (Text)
 import qualified Data.Text.Lazy as TextL
 import qualified Data.Text.Lazy.Encoding as TextL
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden
 
@@ -18,6 +21,14 @@ import qualified Data.Text as Text
 
 testGolden :: String -> FilePath -> IO Text -> TestTree
 testGolden name fp = goldenVsString name ("test/golden/" ++ fp) . fmap (TextL.encodeUtf8 . TextL.fromStrict . normalizePgmError)
+
+testGoldenVersioned :: String -> FilePath -> IO Text -> TestTree
+testGoldenVersioned name fp = testGolden name fp'
+  where
+    fp' =
+      case unsafePerformIO (lookupEnv "TEST_PREFER_OLDEST") of
+        Just "1" -> fp <> ".prefer-oldest"
+        _ -> fp
 
 -- GHC 9.4 added a prefix to pgmError messages. Normalize old versions to show new format.
 normalizePgmError :: Text -> Text

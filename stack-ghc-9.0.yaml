@@ -1,7 +1,0 @@
-# This snapshot pins the oldest supported GHC version and the lower
-# bounds of all dependent packages.
-
-resolver: lts-19.0
-
-ghc-options:
-  '$locals': -Werror

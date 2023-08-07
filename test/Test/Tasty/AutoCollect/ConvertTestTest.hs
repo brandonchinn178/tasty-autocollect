@@ -290,7 +290,7 @@ addQuickCheck proj = proj{dependencies = "tasty-quickcheck" : dependencies proj}
 {----- tasty-expected-failure integration -----}
 
 test =
-  testGolden "expectFail succeeds when test fails" "test_expectFail_output.golden" $ do
+  testGoldenVersioned "expectFail succeeds when test fails" "test_expectFail_output.golden" $ do
     (stdout, _) <-
       assertSuccess . runTest $
         [ "test_expectFail = testCase \"failing test\" $ 1 @?= 2"
@@ -298,7 +298,7 @@ test =
     pure (normalizeTestOutput stdout)
 
 test =
-  testGolden "expectFailBecause succeeds when test fails" "test_expectFailBecause_output.golden" $ do
+  testGoldenVersioned "expectFailBecause succeeds when test fails" "test_expectFailBecause_output.golden" $ do
     (stdout, _) <-
       assertSuccess . runTest $
         [ "test_expectFailBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
@@ -314,7 +314,7 @@ test =
     pure (normalizeTestOutput stdout)
 
 test =
-  testGolden "ignoreTestBecause succeeds when test fails" "test_ignoreTestBecause_output.golden" $ do
+  testGoldenVersioned "ignoreTestBecause succeeds when test fails" "test_ignoreTestBecause_output.golden" $ do
     (stdout, _) <-
       assertSuccess . runTest $
         [ "test_ignoreTestBecause \"some reason\" = testCase \"failing test\" $ 1 @?= 2"
@@ -322,7 +322,7 @@ test =
     pure (normalizeTestOutput stdout)
 
 test =
-  testGolden "expected-failure modifiers work on test_batch" "test_batch_expectFailBecause_output.golden" $ do
+  testGoldenVersioned "expected-failure modifiers work on test_batch" "test_batch_expectFailBecause_output.golden" $ do
     (stdout, _) <-
       assertAnyFailure . runTest $
         [ "test_batch_expectFailBecause \"some reason\" ="

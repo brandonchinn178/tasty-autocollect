@@ -8,19 +8,8 @@ on:
 
 jobs:
   build_and_test:
-    strategy:
-      matrix:
-        include:
-          -
-            stack_yaml: stack.yaml
-            latest: true
-          -
-            stack_yaml: stack-ghc-9.0.yaml
-
-    name: build_and_test (${{ matrix.stack_yaml }})
+    name: build_and_test
     runs-on: ubuntu-latest
-    env:
-      STACK_YAML: ${{ matrix.stack_yaml }}
 
     steps:
       -
@@ -29,7 +18,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
+          key: ${{ runner.os }}-stack-cache-${{ hashFiles('stack.yaml', 'package.yaml') }}
       -
         name: Build + test
         run: stack test --coverage
@@ -39,7 +28,6 @@ jobs:
 
       # Upload coverage data
       -
-        if: ${{ matrix.latest }}
         name: Generate coverage data
         run: |
           HPC_LCOV_VERSION=1.1.1
@@ -49,7 +37,6 @@ jobs:
           chmod +x /usr/local/bin/hpc-lcov
           hpc-lcov
       -
-        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v2
         with:
           files: lcov.info
@@ -62,6 +49,9 @@ jobs:
           - '9.2'
           - '9.4'
           - '9.6'
+        include:
+          - ghc_version: '9.0.1'
+            oldest: true
 
     name: ghc_compat_test (${{ matrix.ghc_version }})
     runs-on: ubuntu-latest
@@ -82,7 +72,15 @@ jobs:
             --enable-test \
             --test-options="--color=always" \
             --test-show-details=streaming
-          cabal build --dry-run
+      -
+        if: ${{ matrix.oldest }}
+        name: Use oldest dependencies
+        run: |
+          cabal configure --enable-append --prefer-oldest
+          echo 'TEST_PREFER_OLDEST=1' >> "${GITHUB_ENV}"
+      -
+        name: Get build plan
+        run: cabal build --dry-run
       -
         name: Get current month to clear cache
         run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
