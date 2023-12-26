@@ -22,19 +22,26 @@ import qualified Data.Text as Text
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.ExternalNames
-import Test.Tasty.AutoCollect.GHC
+import Test.Tasty.AutoCollect.GHC hiding (comment)
 
 -- | The plugin to convert a test file. Injected by the preprocessor.
 plugin :: Plugin
 plugin =
-  setKeepRawTokenStream
-    defaultPlugin
-      { pluginRecompile = purePlugin
-      , parsedResultAction = \_ _ result -> do
-          env <- getHscEnv
-          names <- liftIO $ loadExternalNames env
-          pure $ withParsedResultModule result (transformTestModule names)
-      }
+  defaultPlugin
+    { driverPlugin = \_ env ->
+        pure
+          env
+            { hsc_dflags = hsc_dflags env `gopt_set` Opt_KeepRawTokenStream
+            }
+    , pluginRecompile = purePlugin
+    , parsedResultAction = \_ _ result -> do
+        env <- getHscEnv
+        names <- liftIO $ loadExternalNames env
+        pure
+          result
+            { parsedResultModule = transformTestModule names $ parsedResultModule result
+            }
+    }
 
 -- | Transforms a test module of the form
 --
@@ -76,7 +83,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
 
     -- Replace "{- AUTOCOLLECT.TEST.export -}" with `tests` in the export list
     updateExports lexports
-      | Just exportSpan <- firstLocatedWhere getTestExportAnnSrcSpan (getExportComments parsedModl lexports) =
+      | Just exportSpan <- firstLocatedWhere getTestExportAnnSrcSpan (getExportComments lexports) =
           (L (toSrcAnnA exportSpan) exportIE :) <$> lexports
       | otherwise =
           lexports
@@ -89,7 +96,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     -- Generate the `tests` list
     mkTestsList :: [LocatedN RdrName] -> [LHsDecl GhcPs]
     mkTestsList testNames =
-      let testsList = genLoc $ mkExplicitList $ map lhsvar testNames
+      let testsList = genLoc $ ExplicitList noAnn $ map lhsvar testNames
        in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
           , genLoc $ genFuncDecl testListName [] (flattenTestList testsList) Nothing
           ]
@@ -212,7 +219,7 @@ convertTest names ldecl =
           withTestModifier names modifier loc $
             convertSingleTestBody testType' body
 
-    singleExpr = genLoc . mkExplicitList . (: [])
+    singleExpr = genLoc . ExplicitList noAnn . (: [])
 
 -- | Identifier for the generated `tests` list.
 testListName :: LocatedN RdrName

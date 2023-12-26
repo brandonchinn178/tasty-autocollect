@@ -12,14 +12,6 @@ import GHC.Hs
 import GHC.Types.Basic (PromotionFlag)
 #endif
 import GHC.Types.Name.Reader (RdrName)
-#if __GLASGOW_HASKELL__ < 902
-import GHC.Types.SrcLoc (Located)
-#endif
-
-#if __GLASGOW_HASKELL__ < 902
-type LocatedA = Located
-type LocatedN = Located
-#endif
 
 data ParsedDecl
   = FuncSig [LocatedN RdrName] (LHsSigWcType GhcPs)

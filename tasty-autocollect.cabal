@@ -63,15 +63,15 @@ library
       src
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   build-depends:
-      base >=4.14 && <5
+      base >=4.17 && <5
     , bytestring <0.13
     , containers <0.7
     , directory <2
     , filepath <2
-    , ghc >=9.0 && <9.9
+    , ghc >=9.4 && <9.9
     , tasty <2
     , tasty-expected-failure <1
-    , template-haskell >=2.16 && <2.22
+    , template-haskell >=2.19 && <2.22
     , text <3
     , transformers <1
   default-language: Haskell2010
@@ -84,12 +84,6 @@ library
   if impl(ghc >= 9.4) && impl(ghc < 9.6)
     other-modules:
         Test.Tasty.AutoCollect.GHC.Shim_9_4
-  if impl(ghc >= 9.2) && impl(ghc < 9.4)
-    other-modules:
-        Test.Tasty.AutoCollect.GHC.Shim_9_2
-  if impl(ghc >= 9.0) && impl(ghc < 9.2)
-    other-modules:
-        Test.Tasty.AutoCollect.GHC.Shim_9_0
 
 executable tasty-autocollect
   main-is: Preprocessor.hs
