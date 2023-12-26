@@ -8,8 +8,8 @@ module TestUtils.Golden (
 ) where
 
 import Data.Text (Text)
-import qualified Data.Text.Lazy as TextL
-import qualified Data.Text.Lazy.Encoding as TextL
+import Data.Text.Lazy qualified as TextL
+import Data.Text.Lazy.Encoding qualified as TextL
 import System.Environment (lookupEnv)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree)

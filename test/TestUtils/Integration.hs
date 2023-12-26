@@ -29,10 +29,10 @@ module TestUtils.Integration (
 import Control.Monad (forM_, void)
 import Data.Char (isDigit)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
-import qualified Data.Text.Lazy as TextL
-import qualified Data.Text.Lazy.Encoding as TextL
+import Data.Text qualified as Text
+import Data.Text.IO qualified as Text
+import Data.Text.Lazy qualified as TextL
+import Data.Text.Lazy.Encoding qualified as TextL
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory, (</>))
 import System.IO.Temp (withSystemTempDirectory)

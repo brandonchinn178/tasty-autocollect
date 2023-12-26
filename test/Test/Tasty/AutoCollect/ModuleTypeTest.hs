@@ -7,7 +7,7 @@ module Test.Tasty.AutoCollect.ModuleTypeTest (
 
 ) where
 
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Test.Predicates
 import Test.Predicates.HUnit
 import Test.Predicates.QuickCheck

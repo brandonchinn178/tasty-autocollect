@@ -5,7 +5,7 @@ module Test.Tasty.AutoCollect.Utils.TreeMapTest (
 
 ) where
 
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Test.Tasty.HUnit
 
 import Test.Tasty.AutoCollect.Utils.TreeMap

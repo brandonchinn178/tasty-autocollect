@@ -22,6 +22,9 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -Wnoncanonical-monad-instances
 
+default-extensions:
+  - ImportQualifiedPost
+
 library:
   source-dirs: src
   other-modules:

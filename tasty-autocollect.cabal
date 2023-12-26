@@ -61,6 +61,8 @@ library
       Test.Tasty.AutoCollect.GHC.Shim_Common
   hs-source-dirs:
       src
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   build-depends:
       base >=4.17 && <5
@@ -91,6 +93,8 @@ executable tasty-autocollect
       Paths_tasty_autocollect
   hs-source-dirs:
       exe
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
   build-depends:
       base >=4.14 && <5
@@ -116,6 +120,8 @@ test-suite tasty-autocollect-tests
       Paths_tasty_autocollect
   hs-source-dirs:
       test
+  default-extensions:
+      ImportQualifiedPost
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wnoncanonical-monad-instances -F -pgmF=tasty-autocollect
   build-depends:
       base

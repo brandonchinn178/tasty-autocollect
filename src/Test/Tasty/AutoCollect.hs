@@ -5,7 +5,7 @@ module Test.Tasty.AutoCollect (
 ) where
 
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.GenerateMain

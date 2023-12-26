@@ -7,7 +7,7 @@ module Test.Tasty.AutoCollect.ModuleType (
 
 import Data.Char (isSpace)
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 
 import Test.Tasty.AutoCollect.Config
 import Test.Tasty.AutoCollect.Constants

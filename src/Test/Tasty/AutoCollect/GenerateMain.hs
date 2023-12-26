@@ -7,14 +7,14 @@ module Test.Tasty.AutoCollect.GenerateMain (
 ) where
 
 import Control.Monad (guard)
-import qualified Data.ByteString as ByteString
+import Data.ByteString qualified as ByteString
 import Data.Char (isDigit, isLower, isUpper)
 import Data.List (sortOn)
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
+import Data.Text qualified as Text
+import Data.Text.Encoding qualified as Text
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath (makeRelative, splitExtensions, takeDirectory, (</>))
 
@@ -23,7 +23,7 @@ import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error
 import Test.Tasty.AutoCollect.ModuleType
 import Test.Tasty.AutoCollect.Utils.Text
-import qualified Test.Tasty.AutoCollect.Utils.TreeMap as TreeMap
+import Test.Tasty.AutoCollect.Utils.TreeMap qualified as TreeMap
 
 generateMainModule :: AutoCollectConfig -> FilePath -> Text -> IO Text
 generateMainModule cfg path originalMain = do

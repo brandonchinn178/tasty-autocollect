@@ -11,13 +11,13 @@ module Test.Tasty.AutoCollect.ConvertTest (
 import Control.Arrow ((&&&))
 import Control.Monad (unless, zipWithM)
 import Control.Monad.Trans.State.Strict (State)
-import qualified Control.Monad.Trans.State.Strict as State
+import Control.Monad.Trans.State.Strict qualified as State
 import Data.Foldable (toList)
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe (isNothing)
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
-import qualified Data.Text as Text
+import Data.Sequence qualified as Seq
+import Data.Text qualified as Text
 
 import Test.Tasty.AutoCollect.Constants
 import Test.Tasty.AutoCollect.Error

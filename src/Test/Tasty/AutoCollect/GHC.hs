@@ -43,9 +43,9 @@ module Test.Tasty.AutoCollect.GHC (
 import Data.Foldable (foldl')
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
-import qualified Data.Text as Text
-import qualified GHC.Data.Strict as Strict
-import qualified GHC.Types.Name.Occurrence as NameSpace (tcName, varName)
+import Data.Text qualified as Text
+import GHC.Data.Strict qualified as Strict
+import GHC.Types.Name.Occurrence qualified as NameSpace (tcName, varName)
 
 import Test.Tasty.AutoCollect.GHC.Shim hiding (
   mkHsAppTypes,
