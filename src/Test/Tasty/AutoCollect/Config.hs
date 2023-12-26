@@ -21,8 +21,8 @@ import Control.Monad (forM)
 import Data.Functor.Identity (Identity)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+import Data.Text qualified as Text
+import Data.Text.IO qualified as Text
 import System.FilePath (takeDirectory, (</>))
 
 {----- Configuration -----}

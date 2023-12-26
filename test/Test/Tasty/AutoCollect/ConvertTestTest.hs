@@ -10,7 +10,7 @@ module Test.Tasty.AutoCollect.ConvertTestTest (
 import Control.Monad (forM_)
 import Data.Maybe (maybeToList)
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Test.Predicates
 import Test.Predicates.HUnit
 import Test.Tasty.HUnit

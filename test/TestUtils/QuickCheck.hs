@@ -8,7 +8,7 @@ module TestUtils.QuickCheck (
 import Data.Char (toLower, toUpper)
 import Data.String (IsString)
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Test.Tasty.QuickCheck
 
 newtype PrintableText = PrintableText {getPrintableText :: Text}

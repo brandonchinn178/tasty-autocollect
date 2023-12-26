@@ -10,7 +10,7 @@ module Test.Tasty.AutoCollect.Utils.Text (
 
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 
 withoutPrefix :: Text -> Text -> Text
 withoutPrefix pre s = fromMaybe s $ Text.stripPrefix pre s

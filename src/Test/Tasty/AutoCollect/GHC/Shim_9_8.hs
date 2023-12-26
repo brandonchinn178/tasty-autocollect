@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Test.Tasty.AutoCollect.GHC.Shim_9_4 (
+module Test.Tasty.AutoCollect.GHC.Shim_9_8 (
   -- * Re-exports
   module X,
 
@@ -39,7 +39,7 @@ parseDecl :: LHsDecl GhcPs -> Maybe ParsedDecl
 parseDecl (L _ decl) =
   case decl of
     SigD _ (TypeSig _ names ty) -> Just $ FuncSig names ty
-    ValD _ (FunBind _ name MG{mg_alts = L _ matches} _) ->
+    ValD _ (FunBind _ name MG{mg_alts = L _ matches}) ->
       Just $ FuncDef name $ map (fmap parseFuncSingleDef) matches
     _ -> Nothing
   where
@@ -53,17 +53,17 @@ parseDecl (L _ decl) =
       FuncGuardedBody guards body
 
 generatedOrigin :: Origin
-generatedOrigin = Generated
+generatedOrigin = Generated DoPmc
 
 {----- Compat / Expr -----}
 
 mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> HsExpr GhcPs
-mkHsAppType e t = HsAppType generatedSrcSpan e (HsWC noExtField t)
+mkHsAppType e t = HsAppType noExtField e (L NoTokenLoc HsTok) (HsWC noExtField t)
 
 {----- Compat / Name -----}
 
-mkIEVar :: LIEWrappedName (IdP GhcPs) -> IE GhcPs
-mkIEVar = IEVar noExtField
+mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
+mkIEVar = IEVar Nothing
 
-mkIEName :: LocatedN RdrName -> IEWrappedName RdrName
-mkIEName = IEName
+mkIEName :: LocatedN RdrName -> IEWrappedName GhcPs
+mkIEName = IEName noExtField

@@ -39,5 +39,5 @@ loadExternalNames env = do
   pure ExternalNames{..}
   where
     loadName name =
-      thNameToGhcNameIO env (hsc_NC env) name
+      thNameToGhcNameIO (hsc_NC env) name
         >>= maybe (autocollectError $ "Could not get Name for " ++ show name) pure

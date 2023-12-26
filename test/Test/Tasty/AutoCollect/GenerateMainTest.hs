@@ -6,9 +6,9 @@ module Test.Tasty.AutoCollect.GenerateMainTest (
 
 ) where
 
-import qualified Data.ByteString as ByteString
+import Data.ByteString qualified as ByteString
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import System.FilePath ((</>))
 import Test.Predicates
 import Test.Predicates.HUnit

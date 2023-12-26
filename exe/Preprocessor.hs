@@ -19,7 +19,7 @@ what we'll do here is:
 -}
 module Main where
 
-import qualified Data.Text.IO as Text
+import Data.Text.IO qualified as Text
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import System.Environment (getArgs)
 import Test.Tasty.AutoCollect (processFile)
