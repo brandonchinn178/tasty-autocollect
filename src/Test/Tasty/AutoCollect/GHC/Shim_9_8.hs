@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Test.Tasty.AutoCollect.GHC.Shim_9_2 (
+module Test.Tasty.AutoCollect.GHC.Shim_9_8 (
   -- * Re-exports
   module X,
 
@@ -48,13 +48,16 @@ import GHC.Plugins as X hiding (
   AnnExpr' (..),
   getHscEnv,
   mkLet,
+  msg,
   showPpr,
+  thNameToGhcNameIO,
   varName,
  )
 import GHC.Types.Name.Cache as X (NameCache)
 
-import Data.IORef (IORef)
 import qualified Data.Text as Text
+import qualified GHC.Data.Strict as Strict
+import qualified GHC.Plugins as GHC (thNameToGhcNameIO)
 import qualified Language.Haskell.TH as TH
 
 import Test.Tasty.AutoCollect.GHC.Shim_Common
@@ -72,8 +75,8 @@ setKeepRawTokenStream plugin =
             }
     }
 
-withParsedResultModule :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
-withParsedResultModule = flip ($)
+withParsedResultModule :: ParsedResult -> (HsParsedModule -> HsParsedModule) -> ParsedResult
+withParsedResultModule result f = result{parsedResultModule = f $ parsedResultModule result}
 
 {----- Compat / Annotations -----}
 
@@ -84,10 +87,7 @@ getExportComments _ = map fromLEpaComment . priorComments . epAnnComments . ann 
     fromLEpaComment (L Anchor{anchor} EpaComment{ac_tok}) =
       L anchor $ (Text.unpack . Text.strip . unwrap) ac_tok
     unwrap = \case
-      EpaDocCommentNext s -> withoutPrefix "-- |" $ Text.pack s
-      EpaDocCommentPrev s -> withoutPrefix "-- ^" $ Text.pack s
-      EpaDocCommentNamed s -> withoutPrefix "-- $" $ Text.pack s
-      EpaDocSection _ s -> Text.pack s
+      EpaDocComment doc -> Text.pack $ renderHsDocString doc
       EpaDocOptions s -> Text.pack s
       EpaLineComment s -> withoutPrefix "--" $ Text.pack s
       EpaBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
@@ -97,7 +97,7 @@ generatedSrcAnn :: SrcAnn ann
 generatedSrcAnn = SrcSpanAnn noAnn generatedSrcSpan
 
 toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
-toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Nothing)
+toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Strict.Nothing)
 
 {----- Compat / Decl -----}
 
@@ -105,7 +105,7 @@ parseDecl :: LHsDecl GhcPs -> Maybe ParsedDecl
 parseDecl (L _ decl) =
   case decl of
     SigD _ (TypeSig _ names ty) -> Just $ FuncSig names ty
-    ValD _ (FunBind _ name MG{mg_alts = L _ matches} _) ->
+    ValD _ (FunBind _ name MG{mg_alts = L _ matches}) ->
       Just $ FuncDef name $ map (fmap parseFuncSingleDef) matches
     _ -> Nothing
   where
@@ -119,7 +119,7 @@ parseDecl (L _ decl) =
       FuncGuardedBody guards body
 
 generatedOrigin :: Origin
-generatedOrigin = Generated
+generatedOrigin = Generated DoPmc
 
 {----- Compat / Type -----}
 
@@ -142,36 +142,23 @@ mkExplicitTuple :: [HsTupArg GhcPs] -> Boxity -> HsExpr GhcPs
 mkExplicitTuple = ExplicitTuple noAnn
 
 mkLet :: HsLocalBinds GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkLet binds expr = HsLet noAnn binds expr
+mkLet binds expr = HsLet noAnn tokenLoc binds tokenLoc expr
 
 mkHsAppType :: LHsExpr GhcPs -> LHsType GhcPs -> HsExpr GhcPs
-mkHsAppType e t = HsAppType generatedSrcSpan e (HsWC noExtField t)
+mkHsAppType e t = HsAppType noExtField e tokenLoc (HsWC noExtField t)
+
+tokenLoc :: LHsToken tok GhcPs
+tokenLoc = L NoTokenLoc HsTok
 
 {----- Compat / Name -----}
 
 mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
-mkIEVar = IEVar noExtField
+mkIEVar = IEVar Nothing
 
-mkIEName :: LocatedN RdrName -> IEWrappedName RdrName
-mkIEName = IEName
+mkIEName :: LocatedN RdrName -> IEWrappedName GhcPs
+mkIEName = IEName noExtField
 
 {----- Backports -----}
 
--- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/8492
-thNameToGhcNameIO :: HscEnv -> IORef NameCache -> TH.Name -> IO (Maybe Name)
-thNameToGhcNameIO hscEnv cache name =
-  fmap fst
-    . runCoreM
-      hscEnv{hsc_NC = cache}
-      (unused "cr_rule_base")
-      (strict '.')
-      (unused "cr_module")
-      (strict mempty)
-      (unused "cr_print_unqual")
-      (unused "cr_loc")
-    $ thNameToGhcName name
-  where
-    unused msg = error $ "unexpectedly used: " ++ msg
-
-    -- marks fields that are strict, so we can't use `unused`
-    strict = id
+thNameToGhcNameIO :: HscEnv -> NameCache -> TH.Name -> IO (Maybe Name)
+thNameToGhcNameIO _ = GHC.thNameToGhcNameIO

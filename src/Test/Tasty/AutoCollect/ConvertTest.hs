@@ -84,7 +84,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
       if isTestExportComment comment
         then Just loc
         else Nothing
-    exportIE = IEVar NoExtField $ genLoc $ mkIEName testListName
+    exportIE = mkIEVar $ genLoc $ mkIEName testListName
 
     -- Generate the `tests` list
     mkTestsList :: [LocatedN RdrName] -> [LHsDecl GhcPs]

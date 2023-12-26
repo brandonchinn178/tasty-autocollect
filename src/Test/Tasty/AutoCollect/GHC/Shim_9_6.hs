@@ -20,6 +20,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_6 (
 
   -- ** Decl
   parseDecl,
+  generatedOrigin,
 
   -- ** Type
   parseSigWcType,
@@ -32,6 +33,7 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_6 (
   mkHsAppType,
 
   -- ** Name
+  mkIEVar,
   mkIEName,
 
   -- * Backports
@@ -116,6 +118,9 @@ parseDecl (L _ decl) =
     parseFuncGuardedBody (L _ (GRHS _ guards body)) =
       FuncGuardedBody guards body
 
+generatedOrigin :: Origin
+generatedOrigin = Generated
+
 {----- Compat / Type -----}
 
 parseSigWcType :: LHsSigWcType GhcPs -> Maybe ParsedType
@@ -146,6 +151,9 @@ tokenLoc :: LHsToken tok GhcPs
 tokenLoc = L NoTokenLoc HsTok
 
 {----- Compat / Name -----}
+
+mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
+mkIEVar = IEVar noExtField
 
 mkIEName :: LocatedN RdrName -> IEWrappedName GhcPs
 mkIEName = IEName noExtField

@@ -12,4 +12,6 @@ import Test.Tasty.AutoCollect.GHC.Shim_9_2 as X
 import Test.Tasty.AutoCollect.GHC.Shim_9_4 as X
 #elif __GLASGOW_HASKELL__ == 906
 import Test.Tasty.AutoCollect.GHC.Shim_9_6 as X
+#elif __GLASGOW_HASKELL__ == 908
+import Test.Tasty.AutoCollect.GHC.Shim_9_8 as X
 #endif

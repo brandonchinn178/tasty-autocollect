@@ -64,7 +64,7 @@ genFuncSig funcName funcType =
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
 genFuncDecl :: LocatedN RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (HsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
-  ValD NoExtField . mkFunBind Generated funcName $
+  ValD NoExtField . mkFunBind generatedOrigin funcName $
     [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
     ]
   where
