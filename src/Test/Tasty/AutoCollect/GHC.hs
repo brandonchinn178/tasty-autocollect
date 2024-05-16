@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -36,7 +37,9 @@ module Test.Tasty.AutoCollect.GHC (
   fromRdrName,
 ) where
 
+#if __GLASGOW_HASKELL__ < 910
 import Data.Foldable (foldl')
+#endif
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text qualified as Text
