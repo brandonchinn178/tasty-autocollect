@@ -10,7 +10,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_10 (
   -- * Compat
 
   -- ** Decl
-  parseDecl,
   generatedOrigin,
 
   -- ** Expr
@@ -20,7 +19,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_10 (
 
   -- ** Name
   mkIEVar,
-  mkIEName,
 
   -- ** Annotations + Located
   getEpAnn,
@@ -43,27 +41,9 @@ import GHC.Types.Name.Cache as X (NameCache)
 import Data.Text (Text)
 import Data.Text qualified as Text
 
-import Test.Tasty.AutoCollect.GHC.Shim_Common
 import Test.Tasty.AutoCollect.Utils.Text (withoutPrefix, withoutSuffix)
 
 {----- Compat / Decl -----}
-
-parseDecl :: LHsDecl GhcPs -> Maybe ParsedDecl
-parseDecl (L _ decl) =
-  case decl of
-    SigD _ (TypeSig _ names ty) -> Just $ FuncSig names ty
-    ValD _ (FunBind _ name MG{mg_alts = L _ matches}) ->
-      Just $ FuncDef name $ map (fmap parseFuncSingleDef) matches
-    _ -> Nothing
-  where
-    parseFuncSingleDef Match{m_pats, m_grhss = GRHSs _ bodys whereClause} =
-      FuncSingleDef
-        { funcDefArgs = m_pats
-        , funcDefGuards = map parseFuncGuardedBody bodys
-        , funcDefWhereClause = whereClause
-        }
-    parseFuncGuardedBody (L _ (GRHS _ guards body)) =
-      FuncGuardedBody guards body
 
 generatedOrigin :: Origin
 generatedOrigin = Generated OtherExpansion DoPmc
@@ -83,9 +63,6 @@ mkHsLitString = genLoc . HsLit noExtField . mkHsString
 
 mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
 mkIEVar n = IEVar Nothing n Nothing
-
-mkIEName :: LocatedN RdrName -> IEWrappedName GhcPs
-mkIEName = IEName noExtField
 
 {----- Compat / Annotations + Located -----}
 

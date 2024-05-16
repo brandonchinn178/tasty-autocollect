@@ -10,6 +10,7 @@ module Test.Tasty.AutoCollect.GHC (
   showPpr,
 
   -- * Parsers
+  parseDecl,
   parseLitStrPat,
   parseSigWcType,
 
@@ -57,6 +58,23 @@ showPpr :: (Outputable a) => a -> String
 showPpr = showSDocUnsafe . ppr
 
 {----- Parsers ----}
+
+parseDecl :: LHsDecl GhcPs -> Maybe ParsedDecl
+parseDecl (L _ decl) =
+  case decl of
+    SigD _ (TypeSig _ names ty) -> Just $ FuncSig names ty
+    ValD _ (FunBind _ name MG{mg_alts = L _ matches}) ->
+      Just $ FuncDef name $ map (fmap parseFuncSingleDef) matches
+    _ -> Nothing
+  where
+    parseFuncSingleDef Match{m_pats, m_grhss = GRHSs _ bodys whereClause} =
+      FuncSingleDef
+        { funcDefArgs = m_pats
+        , funcDefGuards = map parseFuncGuardedBody bodys
+        , funcDefWhereClause = whereClause
+        }
+    parseFuncGuardedBody (L _ (GRHS _ guards body)) =
+      FuncGuardedBody guards body
 
 parseLitStrPat :: LPat GhcPs -> Maybe String
 parseLitStrPat = \case
