@@ -4,5 +4,3 @@
 ******************** tasty-autocollect failure ********************
 Expected type: TestTree
 Got: Int
-
-

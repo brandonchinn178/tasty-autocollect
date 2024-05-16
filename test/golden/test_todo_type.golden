@@ -4,5 +4,3 @@
 ******************** tasty-autocollect failure ********************
 Expected type: String
 Got: Int
-
-
