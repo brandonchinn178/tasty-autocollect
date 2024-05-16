@@ -19,16 +19,12 @@ module Test.Tasty.AutoCollect.GHC (
   mkHsVar,
   mkHsAppTypes,
   mkHsTyVar,
-  mkLet,
   mkExprTypeSig,
-  mkHsLitString,
 
   -- * Annotation utilities
-  toSrcAnnA,
   getExportComments,
 
   -- * Located utilities
-  genLoc,
   firstLocatedWhere,
   getSpanLine,
 
@@ -44,16 +40,13 @@ import Data.Foldable (foldl')
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text qualified as Text
-import GHC.Data.Strict qualified as Strict
 import GHC.Types.Name.Occurrence qualified as NameSpace (tcName, varName)
 
 import Test.Tasty.AutoCollect.GHC.Shim hiding (
   mkHsAppTypes,
-  mkLet,
   msg,
   showPpr,
  )
-import Test.Tasty.AutoCollect.Utils.Text (withoutPrefix, withoutSuffix)
 
 {----- Output helpers -----}
 
@@ -107,40 +100,22 @@ mkHsAppTypes = foldl' (\e -> genLoc . mkHsAppType e)
 mkHsTyVar :: Name -> LHsType GhcPs
 mkHsTyVar = genLoc . HsTyVar noAnn NotPromoted . genLoc . getRdrName
 
-mkLet :: HsLocalBinds GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkLet binds expr = HsLet noAnn (L NoTokenLoc HsTok) binds (L NoTokenLoc HsTok) expr
-
 -- | mkExprTypeSig e t = [| $e :: $t |]
 mkExprTypeSig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 mkExprTypeSig e t =
   genLoc . ExprWithTySig noAnn e $
     HsWC NoExtField (hsTypeToHsSigType t)
 
-mkHsLitString :: String -> LHsExpr GhcPs
-mkHsLitString = genLoc . HsLit noAnn . mkHsString
-
 {----- Annotation utilities -----}
-
-toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
-toSrcAnnA rss = SrcSpanAnn noAnn (RealSrcSpan rss Strict.Nothing)
 
 -- | Get the contents of all comments in the given hsmodExports list.
 getExportComments :: LocatedL [LIE GhcPs] -> [RealLocated String]
-getExportComments = map fromLEpaComment . priorComments . epAnnComments . ann . getLoc
+getExportComments = map fromLEpaComment . priorComments . epAnnComments . getEpAnn
   where
-    fromLEpaComment (L Anchor{anchor} EpaComment{ac_tok}) =
-      L anchor $ (Text.unpack . Text.strip . unwrap) ac_tok
-    unwrap = \case
-      EpaDocComment doc -> Text.pack $ renderHsDocString doc
-      EpaDocOptions s -> Text.pack s
-      EpaLineComment s -> withoutPrefix "--" $ Text.pack s
-      EpaBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
-      EpaEofComment -> ""
+    fromLEpaComment (L ann EpaComment{ac_tok}) =
+      L (anchor ann) $ (Text.unpack . Text.strip . epaCommentTokText) ac_tok
 
 {----- Located utilities -----}
-
-genLoc :: e -> GenLocated (SrcAnn ann) e
-genLoc = L (SrcSpanAnn noAnn generatedSrcSpan)
 
 firstLocatedWhere :: (Ord l) => (GenLocated l e -> Maybe a) -> [GenLocated l e] -> Maybe a
 firstLocatedWhere f = listToMaybe . mapMaybe f . sortOn getLoc
