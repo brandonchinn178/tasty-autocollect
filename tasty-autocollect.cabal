@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           tasty-autocollect
-version:        0.4.2
+version:        0.4.3
 synopsis:       Autocollection of tasty tests.
 description:    Autocollection of tasty tests. See README.md for more details.
 category:       Testing
