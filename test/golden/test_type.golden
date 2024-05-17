@@ -1,8 +1,6 @@
-
 <no location info>: error:
     
 ******************** tasty-autocollect failure ********************
 Expected type: TestTree
 Got: Int
-
 
