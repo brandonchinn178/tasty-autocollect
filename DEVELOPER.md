@@ -1,5 +1,15 @@
 # Developer notes
 
+## Build and Test
+
+```shell
+cabal build --ghc-options -Werror
+
+# Note: must use the default GHC executable; integration tests
+# will not work with --with-compiler set differently
+cabal exec -- cabal test
+```
+
 ## Contributing
 
 Some things to keep in mind when making changes:
