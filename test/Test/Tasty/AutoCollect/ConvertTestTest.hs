@@ -84,13 +84,11 @@ test = testCase "tests fail when omitting export comment" $ do
     assertAnyFailure . runTestWith (modifyFile "Test.hs" (map removeExports)) $
       [ "test = testCase \"a test\" $ pure ()"
       ]
-  getTestLines stderr @?~ containsStripped (startsWith messagePreGHC94 `orP` startsWith messagePostGHC94)
+  getTestLines stderr @?~ containsStripped (startsWith "NB: the module ‘Test’ does not export")
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test () where"
       | otherwise = s
-    messagePreGHC94 = "Module ‘Test’ does not export"
-    messagePostGHC94 = "NB: the module ‘Test’ does not export"
 
 test = testCase "test file can omit an explicit export list" $ do
   (stdout, _) <-

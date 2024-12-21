@@ -38,9 +38,6 @@ library:
     - condition: impl(ghc >= 9.8) && impl(ghc < 9.10)
       other-modules:
         - Test.Tasty.AutoCollect.GHC.Shim_9_8
-    - condition: impl(ghc >= 9.6) && impl(ghc < 9.8)
-      other-modules:
-        - Test.Tasty.AutoCollect.GHC.Shim_9_6
   dependencies:
     - base >= 4.17 && < 5
     - bytestring < 0.13

@@ -83,9 +83,6 @@ library
   if impl(ghc >= 9.8) && impl(ghc < 9.10)
     other-modules:
         Test.Tasty.AutoCollect.GHC.Shim_9_8
-  if impl(ghc >= 9.6) && impl(ghc < 9.8)
-    other-modules:
-        Test.Tasty.AutoCollect.GHC.Shim_9_6
 
 executable tasty-autocollect
   main-is: Preprocessor.hs

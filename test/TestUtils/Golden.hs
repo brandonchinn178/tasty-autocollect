@@ -16,10 +16,6 @@ import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden
 
-#if __GLASGOW_HASKELL__ < 904
-import qualified Data.Text as Text
-#endif
-
 testGolden :: String -> FilePath -> IO Text -> TestTree
 testGolden name fp = goldenVsString name ("test/golden/" ++ fp) . fmap encodeText
   where

@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module Test.Tasty.AutoCollect.GHC.Shim_Common (
   ParsedDecl (..),
   FuncSingleDef (..),
@@ -8,9 +6,6 @@ module Test.Tasty.AutoCollect.GHC.Shim_Common (
 ) where
 
 import GHC.Hs
-#if __GLASGOW_HASKELL__ < 906
-import GHC.Types.Basic (PromotionFlag)
-#endif
 import GHC.Types.Name.Reader (RdrName)
 
 data ParsedDecl
