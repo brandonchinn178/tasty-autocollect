@@ -8,17 +8,18 @@ module Test.Tasty.AutoCollect.GHC.Shim_Common (
 ) where
 
 import GHC.Hs
-#if __GLASGOW_HASKELL__ < 906
-import GHC.Types.Basic (PromotionFlag)
-#endif
 import GHC.Types.Name.Reader (RdrName)
 
 data ParsedDecl
   = FuncSig [LocatedN RdrName] (LHsSigWcType GhcPs)
   | FuncDef (LocatedN RdrName) [LocatedA FuncSingleDef]
 
+#if __GLASGOW_HASKELL__ < 910
+type LocatedE = LocatedL
+#endif
+
 data FuncSingleDef = FuncSingleDef
-  { funcDefArgs :: [LPat GhcPs]
+  { funcDefArgs :: LocatedE [LPat GhcPs]
   , funcDefGuards :: [FuncGuardedBody]
   , funcDefWhereClause :: HsLocalBinds GhcPs
   }

@@ -98,7 +98,7 @@ transformTestModule names parsedModl = parsedModl{hpm_module = updateModule <$> 
     mkTestsList testNames =
       let testsList = genLoc $ ExplicitList noAnn $ map lhsvar testNames
        in [ genLoc $ genFuncSig testListName $ getListOfTestTreeType names
-          , genLoc $ genFuncDecl testListName [] (flattenTestList testsList) Nothing
+          , genLoc $ genFuncDecl testListName (genLoc []) (flattenTestList testsList) Nothing
           ]
 
     flattenTestList testsList =
@@ -157,7 +157,7 @@ convertTest names ldecl =
             pure . runConvertTestM state $ do
               testBody <- convertSingleTestBody testType body
               State.gets testArgs >>= \case
-                [] -> pure ()
+                L _ [] -> pure ()
                 _ -> autocollectError $ "Found extraneous arguments at " ++ getSpanLine loc
               pure testBody
           _ ->
@@ -170,7 +170,7 @@ convertTest names ldecl =
         [ if isNothing mSigInfo
             then [genLoc $ genFuncSig testName (getListOfTestTreeType names)]
             else []
-        , [genFuncDecl testName [] testBody mWhereClause <$ ldecl]
+        , [genFuncDecl testName (genLoc []) testBody mWhereClause <$ ldecl]
         ]
 
     convertSingleTestBody testType body =
@@ -188,16 +188,16 @@ convertTest names ldecl =
 
           (name, remainingPats) <-
             popRemainingArgs >>= \case
-              arg : rest | Just s <- parseLitStrPat arg -> pure (s, rest)
-              [] -> autocollectError "test_prop requires at least the name of the test"
-              arg : _ ->
+              L ann (arg : rest) | Just s <- parseLitStrPat arg -> pure (s, L ann rest)
+              L _ [] -> autocollectError "test_prop requires at least the name of the test"
+              L _ (arg : _) ->
                 autocollectError . unlines $
                   [ "test_prop expected a String for the name of the test."
                   , "Got: " ++ showPpr arg
                   ]
 
           let propBody =
-                mkHsLam remainingPats $
+                mkHsLam (toMatchArgs remainingPats) $
                   case mWhereClause of
                     Just defs -> genLoc $ mkLet defs body
                     Nothing -> body
@@ -344,7 +344,7 @@ type ConvertTestM = State ConvertTestState
 data ConvertTestState = ConvertTestState
   { mSigType :: Maybe (LHsSigWcType GhcPs)
   , mWhereClause :: Maybe (HsLocalBinds GhcPs)
-  , testArgs :: [LPat GhcPs]
+  , testArgs :: LocatedE [LPat GhcPs]
   }
 
 runConvertTestM :: ConvertTestState -> ConvertTestM a -> (a, ConvertTestState)
@@ -355,15 +355,15 @@ popArg = do
   state <- State.get
   let (mArg, rest) =
         case testArgs state of
-          [] -> (Nothing, [])
-          arg : args -> (Just arg, args)
+          L ann [] -> (Nothing, L ann [])
+          L ann (arg : args) -> (Just arg, L ann args)
   State.put state{testArgs = rest}
   pure mArg
 
-popRemainingArgs :: ConvertTestM [LPat GhcPs]
+popRemainingArgs :: ConvertTestM (LocatedE [LPat GhcPs])
 popRemainingArgs = do
   state@ConvertTestState{testArgs} <- State.get
-  State.put state{testArgs = []}
+  State.put state{testArgs = genLoc []}
   pure testArgs
 
 {----- Test module converter monad -----}

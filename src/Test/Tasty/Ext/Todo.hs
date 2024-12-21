@@ -5,7 +5,6 @@ module Test.Tasty.Ext.Todo (
 ) where
 
 import Data.Proxy (Proxy (..))
-import Data.Typeable (Typeable)
 import Test.Tasty.Options (
   IsOption (..),
   OptionDescription (..),
@@ -22,7 +21,6 @@ import Test.Tasty.Providers (
 import Test.Tasty.Runners (Result (..), TestTree (..))
 
 data TodoTest = TodoTest
-  deriving (Typeable)
 
 instance IsTest TodoTest where
   run opts _ _ = pure testResult{resultShortDescription = "TODO"}
@@ -36,7 +34,6 @@ instance IsTest TodoTest where
   testOptions = pure [Option (Proxy @FailTodos)]
 
 newtype FailTodos = FailTodos Bool
-  deriving (Typeable)
 
 instance IsOption FailTodos where
   defaultValue = FailTodos False

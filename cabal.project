@@ -1,9 +1,10 @@
 packages: .
 
+-- TODO: remove when packages are updated for GHC 9.12
 allow-newer:
-  -- https://github.com/cdsmith/explainable-predicates/pull/19
   , explainable-predicates:base
   , explainable-predicates:template-haskell
+  , unordered-containers:template-haskell
 
 program-options
   ghc-options: -Werror

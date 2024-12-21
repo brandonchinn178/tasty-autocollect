@@ -16,20 +16,29 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_10 (
   mkHsAppType,
   mkLet,
   mkHsLitString,
+  mkPrefixFunRhs,
+  toMatchArgs,
+  fromMatchArgs,
 
   -- ** Name
   mkIEVar,
 
   -- ** Annotations + Located
+  LocatedLI,
   getEpAnn,
   toSrcAnnA,
   genLoc,
   epaCommentTokText,
+  epaLocationRealSrcSpan,
 ) where
 
 -- Re-exports
 import GHC.Driver.Main as X (getHscEnv)
-import GHC.Hs as X hiding (mkHsAppType)
+import GHC.Hs as X hiding (
+  epaLocationRealSrcSpan,
+  mkHsAppType,
+  mkPrefixFunRhs,
+ )
 import GHC.Plugins as X hiding (
   AnnBind (..),
   AnnExpr' (..),
@@ -40,6 +49,7 @@ import GHC.Types.Name.Cache as X (NameCache)
 
 import Data.Text (Text)
 import Data.Text qualified as Text
+import GHC.Hs qualified as GHC
 
 import Test.Tasty.AutoCollect.Utils.Text (withoutPrefix, withoutSuffix)
 
@@ -59,6 +69,15 @@ mkLet binds expr = HsLet (NoEpTok, NoEpTok) binds expr
 mkHsLitString :: String -> LHsExpr GhcPs
 mkHsLitString = genLoc . HsLit noExtField . mkHsString
 
+mkPrefixFunRhs :: fn -> [()] -> HsMatchContext fn
+mkPrefixFunRhs fn _ = GHC.mkPrefixFunRhs fn
+
+toMatchArgs :: LocatedE [LPat GhcPs] -> [LPat GhcPs]
+toMatchArgs = unLoc
+
+fromMatchArgs :: [LPat GhcPs] -> LocatedE [LPat GhcPs]
+fromMatchArgs = genLoc
+
 {----- Compat / Name -----}
 
 mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
@@ -66,13 +85,15 @@ mkIEVar n = IEVar Nothing n Nothing
 
 {----- Compat / Annotations + Located -----}
 
+type LocatedLI = LocatedL
+
 getEpAnn :: GenLocated (EpAnn ann) e -> EpAnn ann
 getEpAnn = getLoc
 
 toSrcAnnA :: RealSrcSpan -> SrcSpanAnnA
 toSrcAnnA rss = EpAnn (realSpanAsAnchor rss) noAnn (EpaComments [])
 
-genLoc :: (NoAnn ann) => e -> GenLocated (EpAnn ann) e
+genLoc :: (NoAnn ann) => e -> GenLocated ann e
 genLoc = L noAnn
 
 epaCommentTokText :: EpaCommentTok -> Text
@@ -81,3 +102,6 @@ epaCommentTokText = \case
   EpaDocOptions s -> Text.pack s
   EpaLineComment s -> withoutPrefix "--" $ Text.pack s
   EpaBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
+
+epaLocationRealSrcSpan :: NoCommentsLocation -> RealSrcSpan
+epaLocationRealSrcSpan = anchor
