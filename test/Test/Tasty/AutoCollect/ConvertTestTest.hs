@@ -1,4 +1,5 @@
 {- AUTOCOLLECT.TEST -}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -84,11 +85,14 @@ test = testCase "tests fail when omitting export comment" $ do
     assertAnyFailure . runTestWith (modifyFile "Test.hs" (map removeExports)) $
       [ "test = testCase \"a test\" $ pure ()"
       ]
-  getTestLines stderr @?~ containsStripped (startsWith "NB: the module ‘Test’ does not export")
+  getTestLines stderr @?~ containsStripped (startsWith message)
   where
     removeExports s
       | "module " `Text.isPrefixOf` s = "module Test () where"
       | otherwise = s
+    message
+      | __GLASGOW_HASKELL__ < (912 :: Int) = "NB: the module ‘Test’ does not export"
+      | otherwise = "Note: The module ‘Test’ does not export"
 
 test = testCase "test file can omit an explicit export list" $ do
   (stdout, _) <-

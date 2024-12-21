@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Test.Tasty.AutoCollect.GHC.Shim_9_10 (
+module Test.Tasty.AutoCollect.GHC.Shim_9_12 (
   -- * Re-exports
   module X,
 
@@ -24,21 +24,15 @@ module Test.Tasty.AutoCollect.GHC.Shim_9_10 (
   mkIEVar,
 
   -- ** Annotations + Located
-  LocatedLI,
   getEpAnn,
   toSrcAnnA,
   genLoc,
   epaCommentTokText,
-  epaLocationRealSrcSpan,
 ) where
 
 -- Re-exports
 import GHC.Driver.Main as X (getHscEnv)
-import GHC.Hs as X hiding (
-  epaLocationRealSrcSpan,
-  mkHsAppType,
-  mkPrefixFunRhs,
- )
+import GHC.Hs as X hiding (mkHsAppType, mkPrefixFunRhs)
 import GHC.Plugins as X hiding (
   AnnBind (..),
   AnnExpr' (..),
@@ -69,14 +63,14 @@ mkLet binds expr = HsLet (NoEpTok, NoEpTok) binds expr
 mkHsLitString :: String -> LHsExpr GhcPs
 mkHsLitString = genLoc . HsLit noExtField . mkHsString
 
-mkPrefixFunRhs :: fn -> [()] -> HsMatchContext fn
-mkPrefixFunRhs fn _ = GHC.mkPrefixFunRhs fn
+mkPrefixFunRhs :: fn -> AnnFunRhs -> HsMatchContext fn
+mkPrefixFunRhs = GHC.mkPrefixFunRhs
 
-toMatchArgs :: LocatedE [LPat GhcPs] -> [LPat GhcPs]
-toMatchArgs = unLoc
+toMatchArgs :: LocatedE [LPat GhcPs] -> LocatedE [LPat GhcPs]
+toMatchArgs = id
 
-fromMatchArgs :: [LPat GhcPs] -> LocatedE [LPat GhcPs]
-fromMatchArgs = genLoc
+fromMatchArgs :: LocatedE [LPat GhcPs] -> LocatedE [LPat GhcPs]
+fromMatchArgs = id
 
 {----- Compat / Name -----}
 
@@ -84,8 +78,6 @@ mkIEVar :: LIEWrappedName GhcPs -> IE GhcPs
 mkIEVar n = IEVar Nothing n Nothing
 
 {----- Compat / Annotations + Located -----}
-
-type LocatedLI = LocatedL
 
 getEpAnn :: GenLocated (EpAnn ann) e -> EpAnn ann
 getEpAnn = getLoc
@@ -102,6 +94,3 @@ epaCommentTokText = \case
   EpaDocOptions s -> Text.pack s
   EpaLineComment s -> withoutPrefix "--" $ Text.pack s
   EpaBlockComment s -> withoutPrefix "{-" . withoutSuffix "-}" $ Text.pack s
-
-epaLocationRealSrcSpan :: NoCommentsLocation -> RealSrcSpan
-epaLocationRealSrcSpan = anchor

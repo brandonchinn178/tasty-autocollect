@@ -32,6 +32,9 @@ library:
     - Test.Tasty.AutoCollect.GHC.Shim
     - Test.Tasty.AutoCollect.GHC.Shim_Common
   when:
+    - condition: impl(ghc >= 9.12) && impl(ghc < 9.14)
+      other-modules:
+        - Test.Tasty.AutoCollect.GHC.Shim_9_12
     - condition: impl(ghc >= 9.10) && impl(ghc < 9.12)
       other-modules:
         - Test.Tasty.AutoCollect.GHC.Shim_9_10
@@ -44,10 +47,10 @@ library:
     - containers < 0.8
     - directory < 2
     - filepath < 2
-    - ghc >= 9.4 && < 9.11
+    - ghc >= 9.4 && < 9.13
     - tasty < 2
     - tasty-expected-failure < 1
-    - template-haskell >= 2.19 && < 2.23
+    - template-haskell >= 2.19 && < 2.24
     - text < 3
     - transformers < 1
 

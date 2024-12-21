@@ -69,7 +69,7 @@ parseDecl (L _ decl) =
   where
     parseFuncSingleDef Match{m_pats, m_grhss = GRHSs _ bodys whereClause} =
       FuncSingleDef
-        { funcDefArgs = m_pats
+        { funcDefArgs = fromMatchArgs m_pats
         , funcDefGuards = map parseFuncGuardedBody bodys
         , funcDefWhereClause = whereClause
         }
@@ -101,10 +101,10 @@ genFuncSig funcName funcType =
     $ funcType
 
 -- | Make simple function declaration of the form `<funcName> <funcArgs> = <funcBody> where <funcWhere>`
-genFuncDecl :: LocatedN RdrName -> [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (HsLocalBinds GhcPs) -> HsDecl GhcPs
+genFuncDecl :: LocatedN RdrName -> LocatedE [LPat GhcPs] -> LHsExpr GhcPs -> Maybe (HsLocalBinds GhcPs) -> HsDecl GhcPs
 genFuncDecl funcName funcArgs funcBody mFuncWhere =
   ValD NoExtField . mkFunBind generatedOrigin funcName $
-    [ mkMatch (mkPrefixFunRhs funcName) funcArgs funcBody funcWhere
+    [ mkMatch (mkPrefixFunRhs funcName noAnn) (toMatchArgs funcArgs) funcBody funcWhere
     ]
   where
     funcWhere = fromMaybe emptyLocalBinds mFuncWhere
@@ -130,11 +130,11 @@ mkExprTypeSig e t =
 {----- Annotation utilities -----}
 
 -- | Get the contents of all comments in the given hsmodExports list.
-getExportComments :: LocatedL [LIE GhcPs] -> [RealLocated String]
+getExportComments :: LocatedLI [LIE GhcPs] -> [RealLocated String]
 getExportComments = map fromLEpaComment . priorComments . epAnnComments . getEpAnn
   where
     fromLEpaComment (L ann EpaComment{ac_tok}) =
-      L (anchor ann) $ (Text.unpack . Text.strip . epaCommentTokText) ac_tok
+      L (epaLocationRealSrcSpan ann) $ (Text.unpack . Text.strip . epaCommentTokText) ac_tok
 
 {----- Located utilities -----}
 
