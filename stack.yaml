@@ -1,4 +1,11 @@
-resolver: lts-23.1
+resolver: nightly-2025-02-28
+
+extra-deps:
+  - explainable-predicates-0.1.2.4
+
+allow-newer: true
+allow-newer-deps:
+  - explainable-predicates
 
 ghc-options:
   '$locals': -Werror
